@@ -23,7 +23,7 @@ Status values:
 | ID | Task | Status | Owner | Last Updated | Notes |
 |---|---|---|---|---|---|
 | T01 | Command contract and UX copy spec | Done | Copilot | 2026-03-22 | README command/failure copy completed; modular Python scaffold created. |
-| T02 | Data model and persistence layer | Not Started |  |  |  |
+| T02 | Data model and persistence layer | Done | Copilot | 2026-03-22 | Added JSON repository with schema versioning, onboarding/adoption transitions, and persistence tests. Next session start: implement T03 in `src/pferdehof_bot/services/`. |
 | T03 | Candidate generation engine (3 horses) | Not Started |  |  |  |
 | T04 | `/start` onboarding flow | Not Started |  |  |  |
 | T05 | Candidate viewing command (`/horse view`) | Not Started |  |  |  |
@@ -42,6 +42,7 @@ Status values:
 | Date | Session | Task ID | Summary of Changes | Tests Run | Result |
 |---|---|---|---|---|---|
 | 2026-03-22 | S01 | T01 | Added full command contract + UX copy to README; created modular package layout and baseline tests. Next session start: implement T02 in `src/pferdehof_bot/repositories/`. | `python -m pytest -q` | Pass (4 passed) |
+| 2026-03-22 | S02 | T02 | Implemented JSON-backed player persistence with schema version, CRUD/upsert, onboarding start, candidate choice, horse finalize flow, and adoption conflict guards in `src/pferdehof_bot/repositories/player_repository.py`; added repository unit tests for CRUD and restart persistence. Next session start: implement T03 in `src/pferdehof_bot/services/`. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` | Pass (6 passed) |
 
 ---
 
