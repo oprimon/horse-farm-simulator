@@ -24,7 +24,7 @@ Status values:
 |---|---|---|---|---|---|
 | T01 | Command contract and UX copy spec | Done | Copilot | 2026-03-22 | README command/failure copy completed; modular Python scaffold created. |
 | T02 | Data model and persistence layer | Done | Copilot | 2026-03-22 | Added JSON repository with schema versioning, onboarding/adoption transitions, and persistence tests. Next session start: implement T03 in `src/pferdehof_bot/services/`. |
-| T03 | Candidate generation engine (3 horses) | Not Started |  |  |  |
+| T03 | Candidate generation engine (3 horses) | Done | Copilot | 2026-03-22 | Added deterministic weighted candidate generator in `src/pferdehof_bot/services/candidate_generator.py` with seed support and anti-duplicate visible profile rerolls; added unit tests. Next session start: implement T04 onboarding flow. |
 | T04 | `/start` onboarding flow | Not Started |  |  |  |
 | T05 | Candidate viewing command (`/horse view`) | Not Started |  |  |  |
 | T06 | Candidate selection command (`/horse choose <id>`) | Not Started |  |  |  |
@@ -43,6 +43,7 @@ Status values:
 |---|---|---|---|---|---|
 | 2026-03-22 | S01 | T01 | Added full command contract + UX copy to README; created modular package layout and baseline tests. Next session start: implement T02 in `src/pferdehof_bot/repositories/`. | `python -m pytest -q` | Pass (4 passed) |
 | 2026-03-22 | S02 | T02 | Implemented JSON-backed player persistence with schema version, CRUD/upsert, onboarding start, candidate choice, horse finalize flow, and adoption conflict guards in `src/pferdehof_bot/repositories/player_repository.py`; added repository unit tests for CRUD and restart persistence. Next session start: implement T03 in `src/pferdehof_bot/services/`. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` | Pass (6 passed) |
+| 2026-03-22 | S03 | T03 | Implemented deterministic candidate generation engine in `src/pferdehof_bot/services/candidate_generator.py` with weighted coat/marking/hint pools, fixed `A/B/C` IDs, and duplicate-visible-profile avoidance; exported service in `src/pferdehof_bot/services/__init__.py`; added generator unit tests in `tests/test_candidate_generator.py`. Next session start: implement T04 onboarding flow. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` | Pass (8 passed) |
 
 ---
 
