@@ -1,5 +1,6 @@
 # Runtime dependencies for platforms that install via `pip install -r requirements.txt`
 # Keep this in sync with [project].dependencies in pyproject.toml.
 discord.py>=2.3.0
+python-dotenv>=1.0.1
 # Install this project package (src layout) when host only runs requirements install.
 .
