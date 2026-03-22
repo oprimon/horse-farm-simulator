@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import start_onboarding_flow, view_candidates_flow
+from pferdehof_bot.services import choose_candidate_flow, start_onboarding_flow, view_candidates_flow
 
 
 def test_start_onboarding_flow_creates_session_for_new_player(tmp_path) -> None:
@@ -143,3 +143,85 @@ def test_view_candidates_flow_renders_candidate_payload(tmp_path) -> None:
     assert "B: Bay with white socks | Hint: Calm" in result.message
     assert "C: Grey with tiny star | Hint: Curious" in result.message
     assert "/horse choose <id>" in result.message
+
+
+def test_choose_candidate_flow_locks_valid_selection_and_persists(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Brave", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Curious", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=123, guild_id=456, candidates=candidates)
+
+    result = choose_candidate_flow(
+        repository=repository,
+        user_id=123,
+        guild_id=456,
+        display_name="Mia",
+        candidate_id="b",
+    )
+
+    assert result.invalid_candidate_id is False
+    assert result.selection_locked is True
+    assert result.selected_candidate_id == "B"
+    assert "/horse name <name>" in result.message
+
+    persisted = repository.get_player(user_id=123, guild_id=456)
+    assert persisted is not None
+    assert persisted["onboarding_session"]["chosen_candidate_id"] == "B"
+
+
+def test_choose_candidate_flow_rejects_invalid_candidate_id(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Brave", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Curious", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=321, guild_id=654, candidates=candidates)
+
+    result = choose_candidate_flow(
+        repository=repository,
+        user_id=321,
+        guild_id=654,
+        display_name="Mia",
+        candidate_id="Z",
+    )
+
+    assert result.invalid_candidate_id is True
+    assert result.selection_locked is False
+    assert result.selected_candidate_id is None
+    assert "Please choose A, B, or C" in result.message
+
+    persisted = repository.get_player(user_id=321, guild_id=654)
+    assert persisted is not None
+    assert persisted["onboarding_session"]["chosen_candidate_id"] is None
+
+
+def test_choose_candidate_flow_blocks_second_choice_when_locked(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Brave", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Curious", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=444, guild_id=555, candidates=candidates)
+    repository.set_chosen_candidate(user_id=444, guild_id=555, candidate_id="A")
+
+    result = choose_candidate_flow(
+        repository=repository,
+        user_id=444,
+        guild_id=555,
+        display_name="Mia",
+        candidate_id="B",
+    )
+
+    assert result.invalid_candidate_id is False
+    assert result.selection_locked is True
+    assert result.selected_candidate_id == "A"
+    assert "irreversible" in result.message
+
+    persisted = repository.get_player(user_id=444, guild_id=555)
+    assert persisted is not None
+    assert persisted["onboarding_session"]["chosen_candidate_id"] == "A"
