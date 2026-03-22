@@ -29,16 +29,46 @@ _MARKING_POOL: tuple[tuple[str, int], ...] = (
     ("with dappled shoulders", 10),
 )
 
-_HINT_POOL: tuple[tuple[str, int], ...] = (
-    ("Brave in new places", 16),
-    ("Steady under pressure", 16),
-    ("Curious around people", 14),
-    ("Quick to learn routines", 14),
-    ("Gentle with nervous riders", 12),
-    ("Playful in the paddock", 10),
-    ("Focused during training", 10),
-    ("Confident with loud sounds", 8),
+_SKILL_KEYS: tuple[str, ...] = (
+    "bond",
+    "energy",
+    "health",
+    "confidence",
+    "skill",
 )
+
+_SKILL_VALUE_POOL: tuple[tuple[int, int], ...] = (
+    (2, 3),
+    (3, 6),
+    (4, 10),
+    (5, 14),
+    (6, 10),
+    (7, 6),
+    (8, 3),
+)
+
+_HINT_BY_PRIMARY_SKILL: dict[str, tuple[str, ...]] = {
+    "bond": (
+        "Seems eager to connect with one person.",
+        "Leans in gently when someone approaches.",
+    ),
+    "energy": (
+        "Looks eager to move and explore.",
+        "Has a lively spark in every step.",
+    ),
+    "health": (
+        "Carries a strong, steady presence.",
+        "Looks robust and well-balanced.",
+    ),
+    "confidence": (
+        "Keeps calm even in unfamiliar moments.",
+        "Holds posture like little surprises do not bother them.",
+    ),
+    "skill": (
+        "Seems quick to understand new routines.",
+        "Watches closely, like learning comes naturally.",
+    ),
+}
 
 
 def generate_candidate_horses(seed: int | str | None = None) -> list[CandidateRecord]:
@@ -63,17 +93,18 @@ def generate_candidate_horses(seed: int | str | None = None) -> list[CandidateRe
 def _build_candidate(candidate_id: str, rng: Random) -> CandidateRecord:
     coat = _weighted_pick(_COAT_POOL, rng)
     marking = _weighted_pick(_MARKING_POOL, rng)
-    hint = _weighted_pick(_HINT_POOL, rng)
+    skills = _build_skills(rng)
+    hint = _derive_hint_from_skills(skills=skills, rng=rng)
 
     return {
         "id": candidate_id,
+        "coat": coat,
+        "marking": marking,
         "appearance_text": f"{coat} {marking}",
         "hint": hint,
         "template_seed": rng.getrandbits(32),
         "hidden": {
-            "coat": coat,
-            "marking": marking,
-            "hint_key": hint,
+            "skills": skills,
         },
     }
 
@@ -89,6 +120,33 @@ def _weighted_pick(weighted_pool: tuple[tuple[str, int], ...], rng: Random) -> s
             return value
 
     return weighted_pool[-1][0]
+
+
+def _build_skills(rng: Random) -> dict[str, int]:
+    skills: dict[str, int] = {}
+    for skill_key in _SKILL_KEYS:
+        skills[skill_key] = _weighted_pick_int(_SKILL_VALUE_POOL, rng)
+    return skills
+
+
+def _weighted_pick_int(weighted_pool: tuple[tuple[int, int], ...], rng: Random) -> int:
+    total_weight = sum(weight for _, weight in weighted_pool)
+    roll = rng.uniform(0, total_weight)
+    running_total = 0.0
+
+    for value, weight in weighted_pool:
+        running_total += weight
+        if roll <= running_total:
+            return value
+
+    return weighted_pool[-1][0]
+
+
+def _derive_hint_from_skills(skills: dict[str, int], rng: Random) -> str:
+    # Pick the strongest skill, with deterministic tie-break order from _SKILL_KEYS.
+    strongest_key = max(_SKILL_KEYS, key=lambda key: skills[key])
+    options = _HINT_BY_PRIMARY_SKILL[strongest_key]
+    return options[rng.randrange(len(options))]
 
 
 def _is_duplicate_visible_profile(candidate: CandidateRecord, existing: list[CandidateRecord]) -> bool:
