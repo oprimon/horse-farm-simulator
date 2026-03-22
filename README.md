@@ -171,3 +171,22 @@ python scripts/summarize_telemetry.py data/telemetry.jsonl
 ```
 
 The script reports unique user counts per funnel step, step-to-step conversion rate, and overall conversion from `start_onboarding`.
+
+## MVP-001 T12 Exit Checklist
+
+Status date: 2026-03-22
+
+- [x] Happy path integration flow passes:
+   - `/start` -> `/horse view` -> `/horse choose A` -> `/horse name Luna` -> `/horse` -> `/greet`
+   - Evidence: `tests/test_mvp001_integration.py::test_mvp001_happy_path_full_onboarding_to_first_interaction`
+- [x] Core failure paths are covered:
+   - Choose before start
+   - Name before choose
+   - Second adoption attempt blocked
+   - Evidence: remaining tests in `tests/test_mvp001_integration.py`
+- [x] Full automated suite passes locally.
+   - Evidence command: `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q`
+   - Evidence result: 55 passed
+
+MVP-001 conclusion:
+- Pass. Horse creation onboarding is implemented, tested, and validated for progression to MVP-002.
