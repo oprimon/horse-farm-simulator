@@ -21,6 +21,16 @@ class StartOnboardingResult:
     reused_active_session: bool
 
 
+@dataclass(frozen=True)
+class ViewCandidatesResult:
+    """Result payload for `/horse view` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_active_session: bool
+    already_adopted: bool
+
+
 def start_onboarding_flow(
     repository: JsonPlayerRepository,
     user_id: int,
@@ -82,3 +92,86 @@ def _has_active_onboarding(player: PlayerRecord | None) -> bool:
         return False
     session = player.get("onboarding_session") or {}
     return bool(session.get("active", False))
+
+
+def view_candidates_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+) -> ViewCandidatesResult:
+    """Render onboarding candidates for a player with an active adoption session."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None:
+        message = (
+            f"No adoption session is active yet, {display_name}. "
+            "Use `/start` to begin your horse journey."
+        )
+        return ViewCandidatesResult(
+            player=None,
+            message=message,
+            has_active_session=False,
+            already_adopted=False,
+        )
+
+    if bool(player.get("adopted", False)):
+        message = (
+            f"You already adopted your horse, {display_name}. "
+            "Visit them with `/horse` and say hello with `/greet`."
+        )
+        return ViewCandidatesResult(
+            player=player,
+            message=message,
+            has_active_session=False,
+            already_adopted=True,
+        )
+
+    session = player.get("onboarding_session") or {}
+    if not bool(session.get("active", False)):
+        message = (
+            f"No adoption session is active yet, {display_name}. "
+            "Use `/start` to begin your horse journey."
+        )
+        return ViewCandidatesResult(
+            player=player,
+            message=message,
+            has_active_session=False,
+            already_adopted=False,
+        )
+
+    candidates = session.get("candidates", [])
+    if not candidates:
+        message = (
+            "Your adoption session has no candidates right now. "
+            "Use `/start` to refresh your journey."
+        )
+        return ViewCandidatesResult(
+            player=player,
+            message=message,
+            has_active_session=False,
+            already_adopted=False,
+        )
+
+    lines = [
+        f"Here are your horse candidates, {display_name}:",
+        "",
+    ]
+    for candidate in candidates:
+        candidate_id = str(candidate.get("id", "?")).upper()
+        appearance = str(candidate.get("appearance_text", "Unknown appearance"))
+        hint = str(candidate.get("hint", "Unknown hint"))
+        lines.append(f"{candidate_id}: {appearance} | Hint: {hint}")
+
+    lines.extend(
+        [
+            "",
+            "Choose the one that feels right: `/horse choose <id>`",
+        ]
+    )
+
+    return ViewCandidatesResult(
+        player=player,
+        message="\n".join(lines),
+        has_active_session=True,
+        already_adopted=False,
+    )

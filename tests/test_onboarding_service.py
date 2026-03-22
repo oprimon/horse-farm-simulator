@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import start_onboarding_flow
+from pferdehof_bot.services import start_onboarding_flow, view_candidates_flow
 
 
 def test_start_onboarding_flow_creates_session_for_new_player(tmp_path) -> None:
@@ -101,3 +101,45 @@ def test_start_onboarding_flow_is_idempotent_when_session_already_active(tmp_pat
     persisted = repository.get_player(user_id=555, guild_id=666)
     assert persisted is not None
     assert persisted["onboarding_session"]["candidates"] == existing_candidates
+
+
+def test_view_candidates_flow_fails_without_active_session(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = view_candidates_flow(
+        repository=repository,
+        user_id=777,
+        guild_id=888,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_active_session is False
+    assert result.already_adopted is False
+    assert "No adoption session is active yet" in result.message
+    assert "/start" in result.message
+
+
+def test_view_candidates_flow_renders_candidate_payload(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Brave", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Curious", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=999, guild_id=111, candidates=candidates)
+
+    result = view_candidates_flow(
+        repository=repository,
+        user_id=999,
+        guild_id=111,
+        display_name="Mia",
+    )
+
+    assert result.player is not None
+    assert result.has_active_session is True
+    assert result.already_adopted is False
+    assert "A: Chestnut with bright blaze | Hint: Brave" in result.message
+    assert "B: Bay with white socks | Hint: Calm" in result.message
+    assert "C: Grey with tiny star | Hint: Curious" in result.message
+    assert "/horse choose <id>" in result.message
