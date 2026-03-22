@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
+import logging
 from typing import Callable
+
+_logger = logging.getLogger(__name__)
 
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.repositories.player_repository import CandidateRecord, PlayerRecord
 
 from .candidate_generator import generate_candidate_horses
+from .moderation import contains_blocked_name_term, validate_horse_name
 from .telemetry import TelemetryLogger
 
 
@@ -77,22 +80,15 @@ class GreetHorseResult:
     has_adopted_horse: bool
 
 
-BLOCKED_NAME_TERMS = {
-    "anal",
-    "asshole",
-    "bitch",
-    "bastard",
-    "cock",
-    "cunt",
-    "dick",
-    "fuck",
-    "motherfucker",
-    "nigger",
-    "pussy",
-    "shit",
-    "slut",
-    "whore",
-}
+@dataclass(frozen=True)
+class AdminRenameHorseResult:
+    """Result payload for admin `horse rename` override command."""
+
+    player: PlayerRecord | None
+    message: str
+    renamed: bool
+    invalid_name: bool
+    target_has_horse: bool
 
 
 def start_onboarding_flow(
@@ -460,8 +456,8 @@ def name_horse_flow(
             already_adopted=False,
         )
 
-    normalized_name = horse_name.strip()
-    if len(normalized_name) < 2 or len(normalized_name) > 20:
+    normalized_name, name_error = validate_horse_name(horse_name)
+    if name_error == "length":
         message = (
             f"That name needs to be between 2 and 20 characters, {display_name}. "
             "Try `/horse name <name>` with a shorter or longer name."
@@ -476,7 +472,13 @@ def name_horse_flow(
             already_adopted=False,
         )
 
-    if _contains_blocked_name_term(normalized_name):
+    if name_error == "profanity":
+        _logger.warning(
+            "Blocked naming attempt by user_id=%s guild_id=%s name=%r.",
+            user_id,
+            guild_id,
+            normalized_name,
+        )
         message = (
             f"That name cannot be used, {display_name}. "
             "Please choose a kinder name with `/horse name <name>`."
@@ -522,9 +524,74 @@ def name_horse_flow(
     )
 
 
-def _contains_blocked_name_term(name: str) -> bool:
-    tokens = [token for token in re.split(r"[^a-z0-9]+", name.lower()) if token]
-    return any(token in BLOCKED_NAME_TERMS for token in tokens)
+def admin_rename_horse_flow(
+    repository: JsonPlayerRepository,
+    admin_display_name: str,
+    target_user_id: int,
+    guild_id: int | None,
+    new_name: str,
+) -> AdminRenameHorseResult:
+    """Override an adopted player's horse name (admin action).
+
+    Permission enforcement (administrator check) is applied at the Discord
+    command layer in ``CoreCog``.  This service function validates the new name
+    and delegates persistence to the repository.
+    """
+    player = repository.get_player(user_id=target_user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"No adopted horse found for user {target_user_id}, {admin_display_name}. "
+            "The player must have completed adoption before a rename is possible."
+        )
+        return AdminRenameHorseResult(
+            player=player,
+            message=message,
+            renamed=False,
+            invalid_name=False,
+            target_has_horse=False,
+        )
+
+    normalized_name, name_error = validate_horse_name(new_name)
+    if name_error is not None:
+        if name_error == "length":
+            reason = "between 2 and 20 characters"
+        else:
+            reason = "free of blocked terms"
+        message = (
+            f"The new name is not valid, {admin_display_name}. "
+            f"Horse names must be {reason}."
+        )
+        return AdminRenameHorseResult(
+            player=player,
+            message=message,
+            renamed=False,
+            invalid_name=True,
+            target_has_horse=True,
+        )
+
+    updated_player = repository.admin_rename_horse(
+        user_id=target_user_id,
+        guild_id=guild_id,
+        new_name=normalized_name,
+    )
+    _logger.info(
+        "Admin rename: admin=%r renamed horse for user_id=%s guild_id=%s new_name=%r.",
+        admin_display_name,
+        target_user_id,
+        guild_id,
+        normalized_name,
+    )
+    message = (
+        f"Horse for user {target_user_id} has been renamed to {normalized_name}, "
+        f"{admin_display_name}. Moderation action logged."
+    )
+    return AdminRenameHorseResult(
+        player=updated_player,
+        message=message,
+        renamed=True,
+        invalid_name=False,
+        target_has_horse=True,
+    )
 
 
 def horse_profile_flow(

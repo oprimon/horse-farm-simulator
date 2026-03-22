@@ -7,6 +7,7 @@ from discord.ext import commands
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     FileTelemetryLogger,
+    admin_rename_horse_flow,
     choose_candidate_flow,
     greet_horse_flow,
     horse_profile_flow,
@@ -96,6 +97,22 @@ class CoreCog(commands.Cog):
             display_name=ctx.author.display_name,
             horse_name=horse_name,
             telemetry_logger=self._telemetry_logger,
+        )
+        await ctx.send(result.message)
+
+    @horse.command(name="rename")
+    @commands.has_permissions(administrator=True)
+    async def horse_rename_admin(
+        self, ctx: commands.Context, target_user_id: int, *, new_name: str
+    ) -> None:
+        """Admin override to rename another player's adopted horse."""
+        guild_id = ctx.guild.id if ctx.guild is not None else None
+        result = admin_rename_horse_flow(
+            repository=self._repository,
+            admin_display_name=ctx.author.display_name,
+            target_user_id=target_user_id,
+            guild_id=guild_id,
+            new_name=new_name,
         )
         await ctx.send(result.message)
 

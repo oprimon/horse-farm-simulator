@@ -183,6 +183,25 @@ class JsonPlayerRepository:
         self._save_data(data)
         return deepcopy(data["players"][key]), first_interaction
 
+    def admin_rename_horse(self, user_id: int, guild_id: int | None, new_name: str) -> PlayerRecord:
+        """Override an adopted player's horse name as an admin moderation action."""
+        data = self._load_data()
+        key = self._player_key(user_id=user_id, guild_id=guild_id)
+        player = data["players"].get(key)
+        if player is None:
+            raise RepositoryError("No player record found for admin rename.")
+
+        horse = player.get("horse")
+        if horse is None or not bool(player.get("adopted", False)):
+            raise RepositoryError("Player has no adopted horse to rename.")
+
+        horse["name"] = new_name
+        player["horse"] = horse
+
+        data["players"][key] = self._normalize_player_record(player)
+        self._save_data(data)
+        return deepcopy(data["players"][key])
+
     def _load_data(self) -> dict[str, Any]:
         if not self._storage_path.exists():
             return {"schema_version": SCHEMA_VERSION, "players": {}}

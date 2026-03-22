@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
+    admin_rename_horse_flow,
     choose_candidate_flow,
     greet_horse_flow,
     horse_profile_flow,
@@ -453,3 +454,125 @@ def test_greet_horse_flow_returns_personalized_response_for_adopter(tmp_path) ->
     assert "You greet Luna softly, Mia." in result.message
     assert "Luna steps closer" in result.message
     assert "happy to see you" in result.message
+
+
+# ---------------------------------------------------------------------------
+# T11 – admin_rename_horse_flow
+# ---------------------------------------------------------------------------
+
+def _make_adopted_repository(tmp_path, user_id: int = 900, guild_id: int = 901) -> JsonPlayerRepository:
+    """Helper: create a repository with a fully adopted player."""
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Brave", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Curious", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=user_id, guild_id=guild_id, candidates=candidates)
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="A")
+    repository.finalize_horse_name(user_id=user_id, guild_id=guild_id, name="Luna")
+    return repository
+
+
+def test_admin_rename_horse_flow_renames_adopted_horse(tmp_path) -> None:
+    repository = _make_adopted_repository(tmp_path)
+
+    result = admin_rename_horse_flow(
+        repository=repository,
+        admin_display_name="AdminUser",
+        target_user_id=900,
+        guild_id=901,
+        new_name="Storm",
+    )
+
+    assert result.renamed is True
+    assert result.invalid_name is False
+    assert result.target_has_horse is True
+    assert "Storm" in result.message
+
+    persisted = repository.get_player(user_id=900, guild_id=901)
+    assert persisted is not None
+    assert persisted["horse"]["name"] == "Storm"
+
+
+def test_admin_rename_horse_flow_rejects_profane_name(tmp_path) -> None:
+    repository = _make_adopted_repository(tmp_path)
+
+    result = admin_rename_horse_flow(
+        repository=repository,
+        admin_display_name="AdminUser",
+        target_user_id=900,
+        guild_id=901,
+        new_name="shit",
+    )
+
+    assert result.renamed is False
+    assert result.invalid_name is True
+    assert result.target_has_horse is True
+
+    persisted = repository.get_player(user_id=900, guild_id=901)
+    assert persisted is not None
+    assert persisted["horse"]["name"] == "Luna"
+
+
+def test_admin_rename_horse_flow_rejects_name_too_short(tmp_path) -> None:
+    repository = _make_adopted_repository(tmp_path)
+
+    result = admin_rename_horse_flow(
+        repository=repository,
+        admin_display_name="AdminUser",
+        target_user_id=900,
+        guild_id=901,
+        new_name="X",
+    )
+
+    assert result.renamed is False
+    assert result.invalid_name is True
+
+
+def test_admin_rename_horse_flow_rejects_name_too_long(tmp_path) -> None:
+    repository = _make_adopted_repository(tmp_path)
+
+    result = admin_rename_horse_flow(
+        repository=repository,
+        admin_display_name="AdminUser",
+        target_user_id=900,
+        guild_id=901,
+        new_name="A" * 21,
+    )
+
+    assert result.renamed is False
+    assert result.invalid_name is True
+
+
+def test_admin_rename_horse_flow_fails_when_player_has_no_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = admin_rename_horse_flow(
+        repository=repository,
+        admin_display_name="AdminUser",
+        target_user_id=999,
+        guild_id=888,
+        new_name="Storm",
+    )
+
+    assert result.renamed is False
+    assert result.invalid_name is False
+    assert result.target_has_horse is False
+    assert "No adopted horse found" in result.message
+
+
+# ---------------------------------------------------------------------------
+# T11 – admin command permission check
+# ---------------------------------------------------------------------------
+
+def test_horse_rename_subcommand_requires_administrator_permission() -> None:
+    """The horse rename subcommand must carry a has_permissions(administrator) check."""
+    from pferdehof_bot.cogs.core import CoreCog
+
+    horse_group = CoreCog.horse
+    rename_cmd = horse_group.get_command("rename")
+
+    assert rename_cmd is not None, "horse rename subcommand must be registered"
+    assert len(rename_cmd.checks) >= 1, "horse rename must have at least one permission check"
+
