@@ -1,0 +1,103 @@
+"""Tests for `/start` onboarding flow service."""
+
+from __future__ import annotations
+
+from pferdehof_bot.repositories import JsonPlayerRepository
+from pferdehof_bot.services import start_onboarding_flow
+
+
+def test_start_onboarding_flow_creates_session_for_new_player(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    generator_calls = 0
+
+    def candidate_generator(seed: int | str | None):
+        nonlocal generator_calls
+        generator_calls += 1
+        return [
+            {"id": "A", "appearance_text": "Chestnut with a bright blaze", "hint": "Brave", "template_seed": 1},
+            {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+            {"id": "C", "appearance_text": "Grey with a tiny star", "hint": "Curious", "template_seed": 3},
+        ]
+
+    result = start_onboarding_flow(
+        repository=repository,
+        user_id=111,
+        guild_id=222,
+        display_name="Mia",
+        candidate_generator=candidate_generator,
+    )
+
+    assert generator_calls == 1
+    assert result.already_adopted is False
+    assert result.reused_active_session is False
+    assert "/horse view" in result.message
+
+    persisted = repository.get_player(user_id=111, guild_id=222)
+    assert persisted is not None
+    assert persisted["onboarding_session"]["active"] is True
+    assert len(persisted["onboarding_session"]["candidates"]) == 3
+
+
+def test_start_onboarding_flow_blocks_when_player_already_adopted(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with a bright blaze", "hint": "Brave", "template_seed": 11},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 12},
+        {"id": "C", "appearance_text": "Grey with a tiny star", "hint": "Curious", "template_seed": 13},
+    ]
+    repository.start_onboarding(user_id=333, guild_id=444, candidates=candidates)
+    repository.set_chosen_candidate(user_id=333, guild_id=444, candidate_id="A")
+    repository.finalize_horse_name(user_id=333, guild_id=444, name="Luna")
+
+    def should_not_run(seed: int | str | None):
+        raise RuntimeError("Candidate generation should not run for adopted players")
+
+    result = start_onboarding_flow(
+        repository=repository,
+        user_id=333,
+        guild_id=444,
+        display_name="Mia",
+        candidate_generator=should_not_run,
+    )
+
+    assert result.already_adopted is True
+    assert result.reused_active_session is False
+    assert "already have a horse" in result.message
+
+
+def test_start_onboarding_flow_is_idempotent_when_session_already_active(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    existing_candidates = [
+        {"id": "A", "appearance_text": "Chestnut with a bright blaze", "hint": "Brave", "template_seed": 21},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 22},
+        {"id": "C", "appearance_text": "Grey with a tiny star", "hint": "Curious", "template_seed": 23},
+    ]
+    repository.start_onboarding(user_id=555, guild_id=666, candidates=existing_candidates)
+
+    generator_calls = 0
+
+    def should_not_run(seed: int | str | None):
+        nonlocal generator_calls
+        generator_calls += 1
+        return [
+            {"id": "A", "appearance_text": "Black with dark stockings", "hint": "Steady", "template_seed": 31},
+            {"id": "B", "appearance_text": "Dun with silver mane", "hint": "Bold", "template_seed": 32},
+            {"id": "C", "appearance_text": "Pinto with broad snip", "hint": "Gentle", "template_seed": 33},
+        ]
+
+    result = start_onboarding_flow(
+        repository=repository,
+        user_id=555,
+        guild_id=666,
+        display_name="Mia",
+        candidate_generator=should_not_run,
+    )
+
+    assert generator_calls == 0
+    assert result.already_adopted is False
+    assert result.reused_active_session is True
+    assert "/horse view" in result.message
+
+    persisted = repository.get_player(user_id=555, guild_id=666)
+    assert persisted is not None
+    assert persisted["onboarding_session"]["candidates"] == existing_candidates
