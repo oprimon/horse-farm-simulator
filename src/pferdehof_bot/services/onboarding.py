@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Callable
 
 from pferdehof_bot.repositories import JsonPlayerRepository
@@ -42,6 +43,37 @@ class ChooseCandidateResult:
     invalid_candidate_id: bool
     has_active_session: bool
     already_adopted: bool
+
+
+@dataclass(frozen=True)
+class NameHorseResult:
+    """Result payload for `/horse name <name>` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    finalized: bool
+    invalid_name: bool
+    has_active_session: bool
+    has_chosen_candidate: bool
+    already_adopted: bool
+
+
+BLOCKED_NAME_TERMS = {
+    "anal",
+    "asshole",
+    "bitch",
+    "bastard",
+    "cock",
+    "cunt",
+    "dick",
+    "fuck",
+    "motherfucker",
+    "nigger",
+    "pussy",
+    "shit",
+    "slut",
+    "whore",
+}
 
 
 def start_onboarding_flow(
@@ -313,3 +345,134 @@ def choose_candidate_flow(
         has_active_session=True,
         already_adopted=False,
     )
+
+
+def name_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+    horse_name: str,
+) -> NameHorseResult:
+    """Finalize horse adoption by validating and persisting a horse name."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None:
+        message = (
+            f"No adoption session is active yet, {display_name}. "
+            "Use `/start` to begin your horse journey."
+        )
+        return NameHorseResult(
+            player=None,
+            message=message,
+            finalized=False,
+            invalid_name=False,
+            has_active_session=False,
+            has_chosen_candidate=False,
+            already_adopted=False,
+        )
+
+    if bool(player.get("adopted", False)):
+        message = (
+            f"You already adopted your horse, {display_name}. "
+            "Visit them with `/horse` and say hello with `/greet`."
+        )
+        return NameHorseResult(
+            player=player,
+            message=message,
+            finalized=False,
+            invalid_name=False,
+            has_active_session=False,
+            has_chosen_candidate=False,
+            already_adopted=True,
+        )
+
+    session = player.get("onboarding_session") or {}
+    if not bool(session.get("active", False)):
+        message = (
+            f"No adoption session is active yet, {display_name}. "
+            "Use `/start` to begin your horse journey."
+        )
+        return NameHorseResult(
+            player=player,
+            message=message,
+            finalized=False,
+            invalid_name=False,
+            has_active_session=False,
+            has_chosen_candidate=False,
+            already_adopted=False,
+        )
+
+    chosen_candidate_id = session.get("chosen_candidate_id")
+    if not chosen_candidate_id:
+        message = (
+            f"Choose your horse first, {display_name}. "
+            "Use `/horse choose <id>` before naming your horse."
+        )
+        return NameHorseResult(
+            player=player,
+            message=message,
+            finalized=False,
+            invalid_name=False,
+            has_active_session=True,
+            has_chosen_candidate=False,
+            already_adopted=False,
+        )
+
+    normalized_name = horse_name.strip()
+    if len(normalized_name) < 2 or len(normalized_name) > 20:
+        message = (
+            f"That name needs to be between 2 and 20 characters, {display_name}. "
+            "Try `/horse name <name>` with a shorter or longer name."
+        )
+        return NameHorseResult(
+            player=player,
+            message=message,
+            finalized=False,
+            invalid_name=True,
+            has_active_session=True,
+            has_chosen_candidate=True,
+            already_adopted=False,
+        )
+
+    if _contains_blocked_name_term(normalized_name):
+        message = (
+            f"That name cannot be used, {display_name}. "
+            "Please choose a kinder name with `/horse name <name>`."
+        )
+        return NameHorseResult(
+            player=player,
+            message=message,
+            finalized=False,
+            invalid_name=True,
+            has_active_session=True,
+            has_chosen_candidate=True,
+            already_adopted=False,
+        )
+
+    updated_player = repository.finalize_horse_name(
+        user_id=user_id,
+        guild_id=guild_id,
+        name=normalized_name,
+    )
+    horse = updated_player.get("horse") or {}
+    appearance = str(horse.get("appearance", "a wonderful horse"))
+    hint = str(horse.get("hint", "steady-hearted"))
+    message = (
+        f"What a beautiful name, {display_name}. {normalized_name} is officially your horse now. "
+        f"{normalized_name} appears as {appearance} and feels {hint}. "
+        "Your adoption is complete."
+    )
+    return NameHorseResult(
+        player=updated_player,
+        message=message,
+        finalized=True,
+        invalid_name=False,
+        has_active_session=False,
+        has_chosen_candidate=True,
+        already_adopted=False,
+    )
+
+
+def _contains_blocked_name_term(name: str) -> bool:
+    tokens = [token for token in re.split(r"[^a-z0-9]+", name.lower()) if token]
+    return any(token in BLOCKED_NAME_TERMS for token in tokens)

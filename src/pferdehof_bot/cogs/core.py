@@ -5,7 +5,12 @@ from pathlib import Path
 from discord.ext import commands
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import choose_candidate_flow, start_onboarding_flow, view_candidates_flow
+from pferdehof_bot.services import (
+    choose_candidate_flow,
+    name_horse_flow,
+    start_onboarding_flow,
+    view_candidates_flow,
+)
 
 
 DEFAULT_PLAYER_STORAGE_PATH = Path("data") / "players.json"
@@ -61,6 +66,19 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=ctx.author.display_name,
             candidate_id=candidate_id,
+        )
+        await ctx.send(result.message)
+
+    @horse.command(name="name")
+    async def horse_name(self, ctx: commands.Context, *, horse_name: str) -> None:
+        """Name the selected onboarding candidate and finalize adoption."""
+        guild_id = ctx.guild.id if ctx.guild is not None else None
+        result = name_horse_flow(
+            repository=self._repository,
+            user_id=ctx.author.id,
+            guild_id=guild_id,
+            display_name=ctx.author.display_name,
+            horse_name=horse_name,
         )
         await ctx.send(result.message)
 
