@@ -5,6 +5,7 @@ from __future__ import annotations
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     choose_candidate_flow,
+    horse_profile_flow,
     name_horse_flow,
     start_onboarding_flow,
     view_candidates_flow,
@@ -336,3 +337,62 @@ def test_name_horse_flow_finalizes_adoption_and_blocks_repeated_naming(tmp_path)
     assert second_attempt.finalized is False
     assert second_attempt.already_adopted is True
     assert "already adopted your horse" in second_attempt.message
+
+
+def test_horse_profile_flow_guides_player_without_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = horse_profile_flow(
+        repository=repository,
+        user_id=700,
+        guild_id=701,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert "do not have a horse yet" in result.message
+    assert "/start" in result.message
+
+
+def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {
+            "id": "A",
+            "appearance_text": "Chestnut with bright blaze",
+            "hint": "Brave",
+            "traits_visible": ["steady", "curious", "friendly"],
+            "template_seed": 1,
+        },
+        {
+            "id": "B",
+            "appearance_text": "Bay with white socks",
+            "hint": "Calm",
+            "template_seed": 2,
+        },
+        {
+            "id": "C",
+            "appearance_text": "Grey with tiny star",
+            "hint": "Curious",
+            "template_seed": 3,
+        },
+    ]
+    repository.start_onboarding(user_id=702, guild_id=703, candidates=candidates)
+    repository.set_chosen_candidate(user_id=702, guild_id=703, candidate_id="A")
+    repository.finalize_horse_name(user_id=702, guild_id=703, name="Luna")
+
+    result = horse_profile_flow(
+        repository=repository,
+        user_id=702,
+        guild_id=703,
+        display_name="Mia",
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert "Name: Luna" in result.message
+    assert "Appearance: Chestnut with bright blaze" in result.message
+    assert "Visible traits: steady, curious" in result.message
+    assert "Mood: Luna" in result.message
+    assert "Energy: Luna" in result.message

@@ -3,10 +3,12 @@
 from .candidate_generator import generate_candidate_horses
 from .onboarding import (
 	ChooseCandidateResult,
+	HorseProfileResult,
 	NameHorseResult,
 	StartOnboardingResult,
 	ViewCandidatesResult,
 	choose_candidate_flow,
+	horse_profile_flow,
 	name_horse_flow,
 	start_onboarding_flow,
 	view_candidates_flow,
@@ -15,10 +17,12 @@ from .onboarding import (
 __all__ = [
 	"generate_candidate_horses",
 	"ChooseCandidateResult",
+	"HorseProfileResult",
 	"NameHorseResult",
 	"StartOnboardingResult",
 	"ViewCandidatesResult",
 	"choose_candidate_flow",
+	"horse_profile_flow",
 	"name_horse_flow",
 	"start_onboarding_flow",
 	"view_candidates_flow",

@@ -58,6 +58,15 @@ class NameHorseResult:
     already_adopted: bool
 
 
+@dataclass(frozen=True)
+class HorseProfileResult:
+    """Result payload for `/horse` profile command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+
+
 BLOCKED_NAME_TERMS = {
     "anal",
     "asshole",
@@ -476,3 +485,57 @@ def name_horse_flow(
 def _contains_blocked_name_term(name: str) -> bool:
     tokens = [token for token in re.split(r"[^a-z0-9]+", name.lower()) if token]
     return any(token in BLOCKED_NAME_TERMS for token in tokens)
+
+
+def horse_profile_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+) -> HorseProfileResult:
+    """Render the adopted horse profile or guide players into onboarding."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        onboarding_session = (player or {}).get("onboarding_session") or {}
+        if bool(onboarding_session.get("active", False)):
+            message = (
+                f"You have not adopted a horse yet, {display_name}. "
+                "Use `/horse view` to review your candidates, or `/start` to restart onboarding."
+            )
+        else:
+            message = (
+                f"You do not have a horse yet, {display_name}. "
+                "Use `/start` to begin your adoption journey."
+            )
+        return HorseProfileResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    appearance = str(horse.get("appearance") or "a lovely companion")
+    traits_visible_raw = horse.get("traits_visible")
+    traits_visible = traits_visible_raw if isinstance(traits_visible_raw, list) else []
+    visible_traits = [str(trait).strip() for trait in traits_visible if str(trait).strip()]
+    trait_preview = visible_traits[:2]
+    if not trait_preview:
+        fallback_hint = str(horse.get("hint") or "steady-hearted")
+        trait_preview = [fallback_hint]
+
+    traits_text = ", ".join(trait_preview)
+    lines = [
+        f"Here is your horse profile, {display_name}:",
+        f"Name: {horse_name}",
+        f"Appearance: {appearance}",
+        f"Visible traits: {traits_text}",
+        f"Mood: {horse_name} seems calm and close to you today.",
+        f"Energy: {horse_name} is ready for a gentle ride and a warm greeting.",
+    ]
+
+    return HorseProfileResult(
+        player=player,
+        message="\n".join(lines),
+        has_adopted_horse=True,
+    )

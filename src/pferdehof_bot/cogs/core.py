@@ -7,6 +7,7 @@ from discord.ext import commands
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     choose_candidate_flow,
+    horse_profile_flow,
     name_horse_flow,
     start_onboarding_flow,
     view_candidates_flow,
@@ -42,7 +43,14 @@ class CoreCog(commands.Cog):
     @commands.group(name="horse", invoke_without_command=True)
     async def horse(self, ctx: commands.Context) -> None:
         """Horse command group for onboarding and horse profile actions."""
-        await ctx.send("Use `/horse view` to see your candidates.")
+        guild_id = ctx.guild.id if ctx.guild is not None else None
+        result = horse_profile_flow(
+            repository=self._repository,
+            user_id=ctx.author.id,
+            guild_id=guild_id,
+            display_name=ctx.author.display_name,
+        )
+        await ctx.send(result.message)
 
     @horse.command(name="view")
     async def horse_view(self, ctx: commands.Context) -> None:
