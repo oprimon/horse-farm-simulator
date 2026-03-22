@@ -26,3 +26,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    "error::DeprecationWarning",
+    "ignore:'audioop' is deprecated and slated for removal in Python 3.13:DeprecationWarning:discord\\.player",
+]
