@@ -67,6 +67,15 @@ class HorseProfileResult:
     has_adopted_horse: bool
 
 
+@dataclass(frozen=True)
+class GreetHorseResult:
+    """Result payload for `/greet` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+
+
 BLOCKED_NAME_TERMS = {
     "anal",
     "asshole",
@@ -537,5 +546,38 @@ def horse_profile_flow(
     return HorseProfileResult(
         player=player,
         message="\n".join(lines),
+        has_adopted_horse=True,
+    )
+
+
+def greet_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+) -> GreetHorseResult:
+    """Render a lightweight personalized greeting for an adopted horse."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"There is no horse to greet yet, {display_name}. "
+            "Start your adoption journey with `/start`."
+        )
+        return GreetHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    hint = str(horse.get("hint") or "gentle")
+    message = (
+        f"You greet {horse_name} softly, {display_name}. "
+        f"{horse_name} steps closer with a {hint.lower()} spark and seems happy to see you."
+    )
+    return GreetHorseResult(
+        player=player,
+        message=message,
         has_adopted_horse=True,
     )

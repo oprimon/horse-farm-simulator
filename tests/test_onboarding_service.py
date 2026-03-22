@@ -5,6 +5,7 @@ from __future__ import annotations
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     choose_candidate_flow,
+    greet_horse_flow,
     horse_profile_flow,
     name_horse_flow,
     start_onboarding_flow,
@@ -396,3 +397,59 @@ def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
     assert "Visible traits: steady, curious" in result.message
     assert "Mood: Luna" in result.message
     assert "Energy: Luna" in result.message
+
+
+def test_greet_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = greet_horse_flow(
+        repository=repository,
+        user_id=800,
+        guild_id=801,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert "There is no horse to greet yet" in result.message
+    assert "/start" in result.message
+
+
+def test_greet_horse_flow_returns_personalized_response_for_adopter(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {
+            "id": "A",
+            "appearance_text": "Chestnut with bright blaze",
+            "hint": "Curious",
+            "template_seed": 1,
+        },
+        {
+            "id": "B",
+            "appearance_text": "Bay with white socks",
+            "hint": "Calm",
+            "template_seed": 2,
+        },
+        {
+            "id": "C",
+            "appearance_text": "Grey with tiny star",
+            "hint": "Brave",
+            "template_seed": 3,
+        },
+    ]
+    repository.start_onboarding(user_id=802, guild_id=803, candidates=candidates)
+    repository.set_chosen_candidate(user_id=802, guild_id=803, candidate_id="A")
+    repository.finalize_horse_name(user_id=802, guild_id=803, name="Luna")
+
+    result = greet_horse_flow(
+        repository=repository,
+        user_id=802,
+        guild_id=803,
+        display_name="Mia",
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert "You greet Luna softly, Mia." in result.message
+    assert "Luna steps closer" in result.message
+    assert "happy to see you" in result.message
