@@ -15,6 +15,7 @@ from .onboarding import (
 	start_onboarding_flow,
 	view_candidates_flow,
 )
+from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
 
 __all__ = [
 	"generate_candidate_horses",
@@ -30,4 +31,8 @@ __all__ = [
 	"name_horse_flow",
 	"start_onboarding_flow",
 	"view_candidates_flow",
+	"FileTelemetryLogger",
+	"TelemetryEvent",
+	"TelemetryLogger",
+	"build_telemetry_event",
 ]

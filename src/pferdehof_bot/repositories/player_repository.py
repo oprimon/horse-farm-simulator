@@ -140,6 +140,8 @@ class JsonPlayerRepository:
             "hint": chosen_candidate.get("hint", ""),
             "name": name,
             "created_at": created_at or self._timestamp_now(),
+            "first_interaction_at": None,
+            "last_interaction_at": None,
         }
         player["adopted"] = True
         player["onboarding_session"] = {
@@ -152,6 +154,34 @@ class JsonPlayerRepository:
         data["players"][key] = self._normalize_player_record(player)
         self._save_data(data)
         return deepcopy(data["players"][key])
+
+    def record_horse_interaction(
+        self,
+        user_id: int,
+        guild_id: int | None,
+        interacted_at: str | None = None,
+    ) -> tuple[PlayerRecord, bool]:
+        """Persist horse interaction timestamps and report whether it was the first one."""
+        data = self._load_data()
+        key = self._player_key(user_id=user_id, guild_id=guild_id)
+        player = data["players"].get(key)
+        if player is None:
+            raise RepositoryError("No player record found for horse interaction.")
+
+        horse = player.get("horse")
+        if horse is None or not bool(player.get("adopted", False)):
+            raise RepositoryError("No adopted horse found for interaction.")
+
+        interaction_timestamp = interacted_at or self._timestamp_now()
+        first_interaction = not bool(horse.get("first_interaction_at"))
+        if first_interaction:
+            horse["first_interaction_at"] = interaction_timestamp
+        horse["last_interaction_at"] = interaction_timestamp
+        player["horse"] = horse
+
+        data["players"][key] = self._normalize_player_record(player)
+        self._save_data(data)
+        return deepcopy(data["players"][key]), first_interaction
 
     def _load_data(self) -> dict[str, Any]:
         if not self._storage_path.exists():
@@ -224,6 +254,8 @@ class JsonPlayerRepository:
                 "hint": horse.get("hint", ""),
                 "name": horse.get("name", ""),
                 "created_at": horse.get("created_at"),
+                "first_interaction_at": horse.get("first_interaction_at"),
+                "last_interaction_at": horse.get("last_interaction_at"),
             }
 
         return normalized

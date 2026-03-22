@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
+    FileTelemetryLogger,
     choose_candidate_flow,
     greet_horse_flow,
     horse_profile_flow,
@@ -16,6 +17,7 @@ from pferdehof_bot.services import (
 
 
 DEFAULT_PLAYER_STORAGE_PATH = Path("data") / "players.json"
+DEFAULT_TELEMETRY_STORAGE_PATH = Path("data") / "telemetry.jsonl"
 
 
 class CoreCog(commands.Cog):
@@ -25,9 +27,11 @@ class CoreCog(commands.Cog):
         self,
         bot: commands.Bot,
         repository: JsonPlayerRepository | None = None,
+        telemetry_logger: FileTelemetryLogger | None = None,
     ) -> None:
         self.bot = bot
         self._repository = repository or JsonPlayerRepository(storage_path=DEFAULT_PLAYER_STORAGE_PATH)
+        self._telemetry_logger = telemetry_logger or FileTelemetryLogger(DEFAULT_TELEMETRY_STORAGE_PATH)
 
     @commands.command(name="start")
     async def start(self, ctx: commands.Context) -> None:
@@ -38,6 +42,7 @@ class CoreCog(commands.Cog):
             user_id=ctx.author.id,
             guild_id=guild_id,
             display_name=ctx.author.display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await ctx.send(result.message)
 
@@ -62,6 +67,7 @@ class CoreCog(commands.Cog):
             user_id=ctx.author.id,
             guild_id=guild_id,
             display_name=ctx.author.display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await ctx.send(result.message)
 
@@ -75,6 +81,7 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=ctx.author.display_name,
             candidate_id=candidate_id,
+            telemetry_logger=self._telemetry_logger,
         )
         await ctx.send(result.message)
 
@@ -88,6 +95,7 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=ctx.author.display_name,
             horse_name=horse_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await ctx.send(result.message)
 
@@ -100,6 +108,7 @@ class CoreCog(commands.Cog):
             user_id=ctx.author.id,
             guild_id=guild_id,
             display_name=ctx.author.display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await ctx.send(result.message)
 

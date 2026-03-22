@@ -91,3 +91,39 @@ def test_repository_persists_across_restart_and_has_schema_version(tmp_path):
         payload = json.load(storage_file)
 
     assert payload["schema_version"] == 1
+
+
+def test_repository_records_first_and_repeat_horse_interactions(tmp_path):
+    storage_path = tmp_path / "players.json"
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    candidates = [
+        {"id": "A", "appearance_text": "Palomino", "hint": "Gentle", "template_seed": 99},
+        {"id": "B", "appearance_text": "Dun", "hint": "Steady", "template_seed": 98},
+        {"id": "C", "appearance_text": "Black", "hint": "Bold", "template_seed": 97},
+    ]
+    repository.start_onboarding(user_id=505, guild_id=606, candidates=candidates)
+    repository.set_chosen_candidate(user_id=505, guild_id=606, candidate_id="A")
+    repository.finalize_horse_name(
+        user_id=505,
+        guild_id=606,
+        name="Nova",
+        created_at="2026-03-22T12:10:00+00:00",
+    )
+
+    first_player, is_first = repository.record_horse_interaction(
+        user_id=505,
+        guild_id=606,
+        interacted_at="2026-03-22T12:15:00+00:00",
+    )
+    assert is_first is True
+    assert first_player["horse"]["first_interaction_at"] == "2026-03-22T12:15:00+00:00"
+    assert first_player["horse"]["last_interaction_at"] == "2026-03-22T12:15:00+00:00"
+
+    second_player, is_second_first = repository.record_horse_interaction(
+        user_id=505,
+        guild_id=606,
+        interacted_at="2026-03-22T12:20:00+00:00",
+    )
+    assert is_second_first is False
+    assert second_player["horse"]["first_interaction_at"] == "2026-03-22T12:15:00+00:00"
+    assert second_player["horse"]["last_interaction_at"] == "2026-03-22T12:20:00+00:00"

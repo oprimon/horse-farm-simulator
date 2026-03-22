@@ -132,3 +132,42 @@ Failure example (not adopted yet):
 ## Status
 
 T01 (command contract and UX copy) is defined in this README. Implementation tasks begin with T02.
+
+## MVP-001 T10 Telemetry Events
+
+Telemetry storage:
+- Structured JSON Lines file at `data/telemetry.jsonl`.
+
+Event payload shape:
+
+```json
+{
+   "event_name": "chose_candidate",
+   "user_id": 123456789,
+   "guild_id": 987654321,
+   "timestamp": "2026-03-22T18:30:00+00:00",
+   "candidate_id": "B"
+}
+```
+
+Required events:
+- `start_onboarding`
+- `viewed_candidates`
+- `chose_candidate`
+- `named_horse`
+- `first_interaction`
+
+Field rules:
+- `event_name`: funnel milestone identifier.
+- `user_id`: Discord user id.
+- `guild_id`: Discord guild id, or `null` for non-guild context.
+- `timestamp`: ISO 8601 UTC timestamp for event emission.
+- `candidate_id`: included for candidate-specific milestones such as `chose_candidate` and `named_horse`.
+
+Funnel summary script:
+
+```bash
+python scripts/summarize_telemetry.py data/telemetry.jsonl
+```
+
+The script reports unique user counts per funnel step, step-to-step conversion rate, and overall conversion from `start_onboarding`.

@@ -10,6 +10,7 @@ from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.repositories.player_repository import CandidateRecord, PlayerRecord
 
 from .candidate_generator import generate_candidate_horses
+from .telemetry import TelemetryLogger
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ def start_onboarding_flow(
     display_name: str,
     candidate_seed: int | str | None = None,
     candidate_generator: Callable[[int | str | None], list[CandidateRecord]] = generate_candidate_horses,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> StartOnboardingResult:
     """Start onboarding for a player or reuse existing active onboarding."""
     existing_player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -137,6 +139,12 @@ def start_onboarding_flow(
         guild_id=guild_id,
         candidates=candidates,
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="start_onboarding",
+        user_id=user_id,
+        guild_id=guild_id,
+    )
 
     message = (
         f"Welcome to Pferdehof, {display_name}. "
@@ -162,6 +170,7 @@ def view_candidates_flow(
     user_id: int,
     guild_id: int | None,
     display_name: str,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> ViewCandidatesResult:
     """Render onboarding candidates for a player with an active adoption session."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -231,6 +240,12 @@ def view_candidates_flow(
             "Choose the one that feels right: `/horse choose <id>`",
         ]
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="viewed_candidates",
+        user_id=user_id,
+        guild_id=guild_id,
+    )
 
     return ViewCandidatesResult(
         player=player,
@@ -246,6 +261,7 @@ def choose_candidate_flow(
     guild_id: int | None,
     display_name: str,
     candidate_id: str,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> ChooseCandidateResult:
     """Lock a candidate choice during onboarding and prompt naming."""
     normalized_candidate_id = candidate_id.strip().upper()
@@ -350,6 +366,13 @@ def choose_candidate_flow(
         guild_id=guild_id,
         candidate_id=normalized_candidate_id,
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="chose_candidate",
+        user_id=user_id,
+        guild_id=guild_id,
+        candidate_id=normalized_candidate_id,
+    )
     message = (
         f"Wonderful choice, {display_name}. Candidate {normalized_candidate_id} is now locked in. "
         "Give your horse a name with `/horse name <name>`."
@@ -371,6 +394,7 @@ def name_horse_flow(
     guild_id: int | None,
     display_name: str,
     horse_name: str,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> NameHorseResult:
     """Finalize horse adoption by validating and persisting a horse name."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -472,6 +496,13 @@ def name_horse_flow(
         guild_id=guild_id,
         name=normalized_name,
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="named_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        candidate_id=str(chosen_candidate_id),
+    )
     horse = updated_player.get("horse") or {}
     appearance = str(horse.get("appearance", "a wonderful horse"))
     hint = str(horse.get("hint", "steady-hearted"))
@@ -555,6 +586,7 @@ def greet_horse_flow(
     user_id: int,
     guild_id: int | None,
     display_name: str,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> GreetHorseResult:
     """Render a lightweight personalized greeting for an adopted horse."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -569,7 +601,19 @@ def greet_horse_flow(
             has_adopted_horse=False,
         )
 
-    horse = player.get("horse") or {}
+    updated_player, is_first_interaction = repository.record_horse_interaction(
+        user_id=user_id,
+        guild_id=guild_id,
+    )
+    if is_first_interaction:
+        _emit_telemetry(
+            telemetry_logger=telemetry_logger,
+            event_name="first_interaction",
+            user_id=user_id,
+            guild_id=guild_id,
+        )
+
+    horse = updated_player.get("horse") or {}
     horse_name = str(horse.get("name") or "Your horse")
     hint = str(horse.get("hint") or "gentle")
     message = (
@@ -577,7 +621,24 @@ def greet_horse_flow(
         f"{horse_name} steps closer with a {hint.lower()} spark and seems happy to see you."
     )
     return GreetHorseResult(
-        player=player,
+        player=updated_player,
         message=message,
         has_adopted_horse=True,
+    )
+
+
+def _emit_telemetry(
+    telemetry_logger: TelemetryLogger | None,
+    event_name: str,
+    user_id: int,
+    guild_id: int | None,
+    candidate_id: str | None = None,
+) -> None:
+    if telemetry_logger is None:
+        return
+    telemetry_logger.emit(
+        event_name=event_name,
+        user_id=user_id,
+        guild_id=guild_id,
+        candidate_id=candidate_id,
     )
