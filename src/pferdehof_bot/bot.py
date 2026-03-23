@@ -63,12 +63,12 @@ async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSett
 
 
 def create_bot(
-    command_prefix: str = "!",
+    command_prefix=commands.when_mentioned,
     command_sync_settings: CommandSyncSettings | None = None,
 ) -> commands.Bot:
     """Create a configured commands.Bot instance."""
     intents = discord.Intents.default()
-    intents.message_content = True
+    intents.message_content = False
 
     bot = commands.Bot(command_prefix=command_prefix, intents=intents)
     sync_settings = command_sync_settings or CommandSyncSettings()

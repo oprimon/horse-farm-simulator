@@ -3,20 +3,27 @@
 import asyncio
 
 import discord
+from discord.ext import commands
 
 from pferdehof_bot.bot import CommandSyncSettings, create_bot, sync_application_commands
 
 
-def test_create_bot_uses_default_prefix():
+def test_create_bot_uses_mention_only_default_prefix() -> None:
     bot = create_bot()
 
-    assert bot.command_prefix == "!"
+    assert bot.command_prefix is commands.when_mentioned
 
 
-def test_create_bot_accepts_custom_prefix():
+def test_create_bot_accepts_custom_prefix() -> None:
     bot = create_bot(command_prefix="/")
 
     assert bot.command_prefix == "/"
+
+
+def test_create_bot_disables_message_content_intent_for_slash_only_mode() -> None:
+    bot = create_bot()
+
+    assert bot.intents.message_content is False
 
 
 def test_sync_application_commands_off_mode_skips_sync() -> None:
