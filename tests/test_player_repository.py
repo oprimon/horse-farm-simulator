@@ -90,7 +90,7 @@ def test_repository_persists_across_restart_and_has_schema_version(tmp_path):
     with storage_path.open("r", encoding="utf-8") as storage_file:
         payload = json.load(storage_file)
 
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
 
 
 def test_repository_records_first_and_repeat_horse_interactions(tmp_path):
@@ -127,3 +127,150 @@ def test_repository_records_first_and_repeat_horse_interactions(tmp_path):
     assert is_second_first is False
     assert second_player["horse"]["first_interaction_at"] == "2026-03-22T12:15:00+00:00"
     assert second_player["horse"]["last_interaction_at"] == "2026-03-22T12:20:00+00:00"
+
+
+def test_repository_migrates_mvp001_adopted_record_to_schema_v2(tmp_path):
+    storage_path = tmp_path / "players.json"
+    with storage_path.open("w", encoding="utf-8") as storage_file:
+        json.dump(
+            {
+                "schema_version": 1,
+                "players": {
+                    "101:202": {
+                        "user_id": 101,
+                        "guild_id": 202,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": "2026-03-20T08:00:00+00:00",
+                        },
+                        "horse": {
+                            "template_seed": 99,
+                            "appearance": "Palomino",
+                            "traits_visible": ["gentle"],
+                            "hint": "Steady",
+                            "name": "Luna",
+                            "created_at": "2026-03-20T09:00:00+00:00",
+                            "first_interaction_at": None,
+                            "last_interaction_at": None,
+                        },
+                    }
+                },
+            },
+            storage_file,
+            indent=2,
+        )
+
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    migrated = repository.get_player(user_id=101, guild_id=202)
+
+    assert migrated is not None
+    horse = migrated["horse"]
+    assert horse is not None
+    assert horse["horse_id"] == 1
+    assert horse["bond"] == 25
+    assert horse["energy"] == 70
+    assert horse["health"] == 75
+    assert horse["confidence"] == 35
+    assert horse["skill"] == 10
+    assert horse["last_fed_at"] is None
+    assert horse["last_groomed_at"] is None
+    assert horse["last_rested_at"] is None
+    assert horse["last_trained_at"] is None
+    assert horse["last_rode_at"] is None
+    assert horse["recent_activity"] is None
+
+    repository.update_horse_state(
+        user_id=101,
+        guild_id=202,
+        updates={
+            "bond": 33,
+            "energy": 120,
+            "last_fed_at": "2026-03-20T10:00:00+00:00",
+            "recent_activity": "Fed Luna after a calm walk.",
+        },
+    )
+
+    with storage_path.open("r", encoding="utf-8") as storage_file:
+        payload = json.load(storage_file)
+    assert payload["schema_version"] == 2
+
+
+def test_list_adopted_horses_by_guild_returns_sorted_scoped_rows(tmp_path):
+    storage_path = tmp_path / "players.json"
+    with storage_path.open("w", encoding="utf-8") as storage_file:
+        json.dump(
+            {
+                "schema_version": 1,
+                "players": {
+                    "501:700": {
+                        "user_id": 501,
+                        "guild_id": 700,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": "2026-03-21T07:00:00+00:00",
+                        },
+                        "horse": {
+                            "appearance": "Grey",
+                            "hint": "Calm",
+                            "name": "Comet",
+                            "created_at": "2026-03-21T08:10:00+00:00",
+                        },
+                    },
+                    "502:700": {
+                        "user_id": 502,
+                        "guild_id": 700,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": "2026-03-21T07:05:00+00:00",
+                        },
+                        "horse": {
+                            "appearance": "Bay",
+                            "hint": "Brave",
+                            "name": "Luna",
+                            "created_at": "2026-03-21T08:00:00+00:00",
+                        },
+                    },
+                    "503:701": {
+                        "user_id": 503,
+                        "guild_id": 701,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": "2026-03-21T07:10:00+00:00",
+                        },
+                        "horse": {
+                            "appearance": "Chestnut",
+                            "hint": "Gentle",
+                            "name": "Nova",
+                            "created_at": "2026-03-21T08:20:00+00:00",
+                        },
+                    },
+                },
+            },
+            storage_file,
+            indent=2,
+        )
+
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    guild_rows = repository.list_adopted_horses_by_guild(guild_id=700)
+
+    assert guild_rows == [
+        {"horse_id": 1, "horse_name": "Luna", "owner_user_id": 502, "guild_id": 700},
+        {"horse_id": 2, "horse_name": "Comet", "owner_user_id": 501, "guild_id": 700},
+    ]
+
+    other_guild_rows = repository.list_adopted_horses_by_guild(guild_id=701)
+    assert other_guild_rows == [
+        {"horse_id": 1, "horse_name": "Nova", "owner_user_id": 503, "guild_id": 701},
+    ]
