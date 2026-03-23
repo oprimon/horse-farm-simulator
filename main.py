@@ -2,7 +2,7 @@
 
 import asyncio
 
-from pferdehof_bot.bot import create_bot, load_extensions
+from pferdehof_bot.bot import CommandSyncSettings, create_bot, load_extensions
 from pferdehof_bot.config import ConfigError, load_config
 
 
@@ -14,7 +14,12 @@ def main() -> None:
         print(f"Configuration error: {exc}")
         return
 
-    bot = create_bot()
+    bot = create_bot(
+        command_sync_settings=CommandSyncSettings(
+            mode=config.command_sync_mode,
+            dev_guild_id=config.command_sync_dev_guild_id,
+        )
+    )
     asyncio.run(load_extensions(bot))
     bot.run(config.token)
 

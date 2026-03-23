@@ -23,18 +23,19 @@ Status values:
 | ID | Task | Status | Owner | Last Updated | Notes |
 |---|---|---|---|---|---|
 | T01 | Slash-command contract and loop UX copy spec | Done | Copilot | 2026-03-23 | Command contract, visibility rules, success/failure examples, and recovery guidance added to `README.md`. |
-| T02 | Horse state model and persistence extension | Not Started | Copilot | 2026-03-23 | Add persistent state for bond, energy, health, confidence, skill, and action timestamps. |
-| T03 | State presentation and profile text service | Not Started | Copilot | 2026-03-23 | Centralize status-band text and reusable profile rendering inputs for commands. |
-| T04 | Feed command (`/feed`) | Not Started | Copilot | 2026-03-23 | Implement first care action with adopted-horse guard and state effect. |
-| T05 | Groom command (`/groom`) | Not Started | Copilot | 2026-03-23 | Implement bonding-focused care action and response copy. |
-| T06 | Rest command (`/rest`) and recovery rules | Not Started | Copilot | 2026-03-23 | Implement recovery action and minimal pacing behavior. |
-| T07 | Training command (`/train`) and progression rules | Not Started | Copilot | 2026-03-23 | Add skill/confidence progression with energy cost and readable feedback. |
-| T08 | Ride outcome engine and content tables | Not Started | Copilot | 2026-03-23 | Build weighted ride outcomes based on horse state with mostly positive early-tone results. |
-| T09 | Ride command (`/ride`) and recent-activity persistence | Not Started | Copilot | 2026-03-23 | Wire slash ride command, persist recent result text, and update `/horse` output. |
-| T10 | Stable roster command (`/stable`) | Not Started | Copilot | 2026-03-23 | Add slash stable command that lists horse ids, horse names, and owner display names for the guild. |
-| T11 | Telemetry and loop instrumentation | Not Started | Copilot | 2026-03-23 | Emit action, ride, and stable view events for funnel and balance analysis. |
-| T12 | Integration tests and loop balance validation | Not Started | Copilot | 2026-03-23 | Cover happy path, stable roster path, poor-state guardrails, and repeat-session persistence. |
-| T13 | MVP exit validation and backlog handoff | Not Started | Copilot | 2026-03-23 | Add README exit checklist and capture next-step recommendation for MVP-003. |
+| T02 | Slash migration and command registry foundation | Done | Copilot | 2026-03-23 | Migrated `/start`, `/horse` subcommands, and `/greet` to slash commands; added centralized command registry metadata and environment-safe command sync strategy (`off`, `guild`, `global`). Admin rename migrated as `/horse rename`. |
+| T03 | Horse state model and persistence extension | Not Started | Copilot | 2026-03-23 | Add persistent state for bond, energy, health, confidence, skill, and action timestamps. |
+| T04 | State presentation and profile text service | Not Started | Copilot | 2026-03-23 | Centralize status-band text and reusable profile rendering inputs for commands. |
+| T05 | Feed command (`/feed`) | Not Started | Copilot | 2026-03-23 | Implement first care action with adopted-horse guard and state effect. |
+| T06 | Groom command (`/groom`) | Not Started | Copilot | 2026-03-23 | Implement bonding-focused care action and response copy. |
+| T07 | Rest command (`/rest`) and recovery rules | Not Started | Copilot | 2026-03-23 | Implement recovery action and minimal pacing behavior. |
+| T08 | Training command (`/train`) and progression rules | Not Started | Copilot | 2026-03-23 | Add skill/confidence progression with energy cost and readable feedback. |
+| T09 | Ride outcome engine and content tables | Not Started | Copilot | 2026-03-23 | Build weighted ride outcomes based on horse state with mostly positive early-tone results. |
+| T10 | Ride command (`/ride`) and recent-activity persistence | Not Started | Copilot | 2026-03-23 | Wire slash ride command, persist recent result text, and update `/horse` output. |
+| T11 | Stable roster command (`/stable`) | Not Started | Copilot | 2026-03-23 | Add slash stable command that lists horse ids, horse names, and owner display names for the guild. |
+| T12 | Telemetry and loop instrumentation | Not Started | Copilot | 2026-03-23 | Emit action, ride, and stable view events for funnel and balance analysis. |
+| T13 | Integration tests and loop balance validation | Not Started | Copilot | 2026-03-23 | Cover happy path, stable roster path, poor-state guardrails, and repeat-session persistence. |
+| T14 | MVP exit validation and backlog handoff | Not Started | Copilot | 2026-03-23 | Add README exit checklist and capture next-step recommendation for MVP-003. |
 
 ---
 
@@ -43,6 +44,7 @@ Status values:
 | Date | Session | Task ID | Summary of Changes | Tests Run | Result |
 |---|---|---|---|---|---|
 | 2026-03-23 | 1 | T01 | Added MVP-002 slash-command UX contract in `README.md` for `/feed`, `/groom`, `/rest`, `/train`, `/ride`, `/stable`, and updated `/horse`; documented visibility, loop order, and failure/recovery copy. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (58 passed) | Done |
+| 2026-03-23 | 2 | T02 | Added centralized command registry (`src/pferdehof_bot/command_registry.py`), migrated player-facing runtime handlers to slash commands, added startup slash sync configuration, updated README slash usage/mapping, and covered slash wiring + sync/config with tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (to run in this session) | Done |
 
 ---
 
@@ -80,7 +82,47 @@ Test checklist:
 
 ---
 
-### T02 - Horse state model and persistence extension
+### T02 - Slash migration and command registry foundation
+Goal: Move the command surface to slash commands and centralize command definitions before adding MVP-002 loop behaviors.
+
+Implementation details:
+- Convert existing player-facing commands from prefix to slash command equivalents:
+  - `/start`
+  - `/horse` (including view, choose, and name behavior)
+  - `/greet`
+- Define a command registry as the source of truth for command metadata.
+- Registry must include at least:
+  - command and subcommand identifiers
+  - response visibility intent (ephemeral or channel)
+  - permission constraints where applicable
+- Add startup command sync strategy for development and rollout safety.
+- Keep behavior parity for MVP-001 flows while changing command transport.
+
+Implementation order checklist:
+1. Add a command registry module and define metadata for existing commands first.
+2. Add slash command sync bootstrap at startup with environment-safe behavior.
+3. Migrate `/start` to slash and verify onboarding entry behavior parity.
+4. Migrate `/horse` slash surface (profile, view, choose, name) and verify full adoption path.
+5. Migrate `/greet` and verify adopted-horse guard behavior.
+6. Decide admin rename scope for this task and either migrate now or defer with explicit note.
+7. Remove or disable old prefix handlers once slash parity tests pass.
+8. Update `README.md` command usage examples from prefix to slash commands.
+9. Run full pytest suite and record result in Session History.
+
+Acceptance criteria:
+- Existing player-facing commands are available as slash commands.
+- Command metadata is centralized in one registry structure, not scattered across handlers.
+- Runtime startup path includes clear command sync behavior.
+- MVP-001 onboarding flow remains functionally equivalent through slash commands.
+
+Test checklist:
+- Unit tests for slash command handler wiring and guardrails.
+- Integration-style test for core onboarding flow via slash commands.
+- Regression tests for admin-only command permission behavior if migrated in scope.
+
+---
+
+### T03 - Horse state model and persistence extension
 Goal: Persist the first care and progression state for each adopted horse.
 
 Implementation details:
@@ -114,7 +156,7 @@ Test checklist:
 
 ---
 
-### T03 - State presentation and profile text service
+### T04 - State presentation and profile text service
 Goal: Make hidden state readable through consistent status text instead of raw numbers.
 
 Implementation details:
@@ -137,7 +179,7 @@ Test checklist:
 
 ---
 
-### T04 - Feed command (`/feed`)
+### T05 - Feed command (`/feed`)
 Goal: Add the first nurturing action that improves readiness and reinforces attachment.
 
 Implementation details:
@@ -157,7 +199,7 @@ Test checklist:
 
 ---
 
-### T05 - Groom command (`/groom`)
+### T06 - Groom command (`/groom`)
 Goal: Add a care action that emphasizes bond and calmness.
 
 Implementation details:
@@ -176,7 +218,7 @@ Test checklist:
 
 ---
 
-### T06 - Rest command (`/rest`) and recovery rules
+### T07 - Rest command (`/rest`) and recovery rules
 Goal: Add the simplest pacing and recovery mechanic so actions feel like part of an ongoing routine.
 
 Implementation details:
@@ -195,7 +237,7 @@ Test checklist:
 
 ---
 
-### T07 - Training command (`/train`) and progression rules
+### T08 - Training command (`/train`) and progression rules
 Goal: Turn care into visible progression by adding a skill-building step with tradeoffs.
 
 Implementation details:
@@ -215,7 +257,7 @@ Test checklist:
 
 ---
 
-### T08 - Ride outcome engine and content tables
+### T09 - Ride outcome engine and content tables
 Goal: Generate short ride stories that reflect horse state and create replayable moments.
 
 Implementation details:
@@ -238,7 +280,7 @@ Test checklist:
 
 ---
 
-### T09 - Ride command (`/ride`) and recent-activity persistence
+### T10 - Ride command (`/ride`) and recent-activity persistence
 Goal: Deliver the first fun action that pays off the care and training loop.
 
 Implementation details:
@@ -260,7 +302,7 @@ Test checklist:
 
 ---
 
-### T10 - Stable roster command (`/stable`)
+### T11 - Stable roster command (`/stable`)
 Goal: Add a social visibility surface that shows the current guild stable at a glance.
 
 Implementation details:
@@ -285,7 +327,7 @@ Test checklist:
 
 ---
 
-### T11 - Telemetry and loop instrumentation
+### T12 - Telemetry and loop instrumentation
 Goal: Measure whether the new loop is being used and where players drop out.
 
 Implementation details:
@@ -315,7 +357,7 @@ Test checklist:
 
 ---
 
-### T12 - Integration tests and loop balance validation
+### T13 - Integration tests and loop balance validation
 Goal: Confirm the full care -> train -> ride journey behaves reliably and supports repeat play.
 
 Implementation details:
@@ -345,7 +387,7 @@ Test checklist:
 
 ---
 
-### T13 - MVP exit validation and backlog handoff
+### T14 - MVP exit validation and backlog handoff
 Goal: Confirm readiness for the next expansion after the solo daily loop is working.
 
 Implementation details:

@@ -567,12 +567,13 @@ def test_admin_rename_horse_flow_fails_when_player_has_no_horse(tmp_path) -> Non
 # ---------------------------------------------------------------------------
 
 def test_horse_rename_subcommand_requires_administrator_permission() -> None:
-    """The horse rename subcommand must carry a has_permissions(administrator) check."""
+    """The horse rename subcommand must enforce administrator default permissions."""
     from pferdehof_bot.cogs.core import CoreCog
 
-    horse_group = CoreCog.horse
+    horse_group = CoreCog.horse_group
     rename_cmd = horse_group.get_command("rename")
 
     assert rename_cmd is not None, "horse rename subcommand must be registered"
-    assert len(rename_cmd.checks) >= 1, "horse rename must have at least one permission check"
+    assert rename_cmd.default_permissions is not None, "horse rename must include default permissions"
+    assert rename_cmd.default_permissions.administrator is True
 

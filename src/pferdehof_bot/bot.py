@@ -1,5 +1,8 @@
 """Bot factory and startup helpers."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Sequence
 
 import discord
@@ -11,19 +14,61 @@ DEFAULT_EXTENSIONS: tuple[str, ...] = (
 )
 
 
-def create_bot(command_prefix: str = "!") -> commands.Bot:
+@dataclass(frozen=True)
+class CommandSyncSettings:
+    """Configuration for startup slash-command synchronization."""
+
+    mode: str = "off"
+    dev_guild_id: int | None = None
+
+
+def _normalized_sync_mode(mode: str) -> str:
+    normalized = mode.strip().lower()
+    if normalized in {"off", "global", "guild"}:
+        return normalized
+    return "off"
+
+
+async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSettings) -> str:
+    """Synchronize app commands based on startup settings.
+
+    Returns the effective sync mode used at runtime.
+    """
+    mode = _normalized_sync_mode(settings.mode)
+    if mode == "off":
+        return mode
+
+    if mode == "guild":
+        if settings.dev_guild_id is None:
+            return "off"
+        guild_object = discord.Object(id=settings.dev_guild_id)
+        bot.tree.copy_global_to(guild=guild_object)
+        await bot.tree.sync(guild=guild_object)
+        return mode
+
+    await bot.tree.sync()
+    return mode
+
+
+def create_bot(
+    command_prefix: str = "!",
+    command_sync_settings: CommandSyncSettings | None = None,
+) -> commands.Bot:
     """Create a configured commands.Bot instance."""
     intents = discord.Intents.default()
     intents.message_content = True
 
     bot = commands.Bot(command_prefix=command_prefix, intents=intents)
+    sync_settings = command_sync_settings or CommandSyncSettings()
 
     @bot.event
     async def on_ready() -> None:
-        if bot.user is None:
-            return
-        print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+        username = str(bot.user) if bot.user is not None else "Unknown"
+        user_id = bot.user.id if bot.user is not None else "Unknown"
+        print(f"Logged in as {username} (ID: {user_id})")
         print("------")
+        sync_mode = await sync_application_commands(bot, sync_settings)
+        print(f"Command sync mode: {sync_mode}")
 
     return bot
 

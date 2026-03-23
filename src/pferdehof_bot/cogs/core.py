@@ -2,8 +2,11 @@
 
 from pathlib import Path
 
+import discord
+from discord import app_commands
 from discord.ext import commands
 
+from pferdehof_bot.command_registry import ResponseVisibility, get_command_metadata
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     FileTelemetryLogger,
@@ -24,6 +27,8 @@ DEFAULT_TELEMETRY_STORAGE_PATH = Path("data") / "telemetry.jsonl"
 class CoreCog(commands.Cog):
     """Core commands available at bot startup."""
 
+    horse_group = app_commands.Group(name="horse", description="Horse onboarding and profile commands")
+
     def __init__(
         self,
         bot: commands.Bot,
@@ -34,100 +39,114 @@ class CoreCog(commands.Cog):
         self._repository = repository or JsonPlayerRepository(storage_path=DEFAULT_PLAYER_STORAGE_PATH)
         self._telemetry_logger = telemetry_logger or FileTelemetryLogger(DEFAULT_TELEMETRY_STORAGE_PATH)
 
-    @commands.command(name="start")
-    async def start(self, ctx: commands.Context) -> None:
+    async def _send_response(self, interaction: discord.Interaction, command_id: str, message: str) -> None:
+        """Send a response based on command visibility metadata."""
+        metadata = get_command_metadata(command_id)
+        is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
+        await interaction.response.send_message(message, ephemeral=is_ephemeral)
+
+    @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
+    async def start(self, interaction: discord.Interaction) -> None:
         """Start or resume player onboarding for horse adoption."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = start_onboarding_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="start", message=result.message)
 
-    @commands.group(name="horse", invoke_without_command=True)
-    async def horse(self, ctx: commands.Context) -> None:
+    @horse_group.command(name="profile", description="Show your current horse profile")
+    async def horse_profile(self, interaction: discord.Interaction) -> None:
         """Horse command group for onboarding and horse profile actions."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = horse_profile_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="horse.profile", message=result.message)
 
-    @horse.command(name="view")
-    async def horse_view(self, ctx: commands.Context) -> None:
+    @horse_group.command(name="view", description="Show current horse candidates")
+    async def horse_view(self, interaction: discord.Interaction) -> None:
         """Display current onboarding horse candidates."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = view_candidates_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="horse.view", message=result.message)
 
-    @horse.command(name="choose")
-    async def horse_choose(self, ctx: commands.Context, candidate_id: str) -> None:
+    @horse_group.command(name="choose", description="Choose one horse candidate by id")
+    @app_commands.describe(candidate_id="Candidate id from /horse view: A, B, or C")
+    async def horse_choose(self, interaction: discord.Interaction, candidate_id: str) -> None:
         """Choose and lock a horse candidate by id."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = choose_candidate_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
             candidate_id=candidate_id,
             telemetry_logger=self._telemetry_logger,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="horse.choose", message=result.message)
 
-    @horse.command(name="name")
-    async def horse_name(self, ctx: commands.Context, *, horse_name: str) -> None:
+    @horse_group.command(name="name", description="Finalize adoption by naming your horse")
+    @app_commands.describe(horse_name="Horse name between 2 and 20 characters")
+    async def horse_name(self, interaction: discord.Interaction, horse_name: str) -> None:
         """Name the selected onboarding candidate and finalize adoption."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = name_horse_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
             horse_name=horse_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="horse.name", message=result.message)
 
-    @horse.command(name="rename")
-    @commands.has_permissions(administrator=True)
-    async def horse_rename_admin(
-        self, ctx: commands.Context, target_user_id: int, *, new_name: str
-    ) -> None:
+    @horse_group.command(name="rename", description="Admin-only rename for a player's adopted horse")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(target_user_id="User id of the horse owner", new_name="New horse name")
+    async def horse_rename_admin(self, interaction: discord.Interaction, target_user_id: int, new_name: str) -> None:
         """Admin override to rename another player's adopted horse."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        admin_display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = admin_rename_horse_flow(
             repository=self._repository,
-            admin_display_name=ctx.author.display_name,
+            admin_display_name=admin_display_name,
             target_user_id=target_user_id,
             guild_id=guild_id,
             new_name=new_name,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="horse.rename", message=result.message)
 
-    @commands.command(name="greet")
-    async def greet(self, ctx: commands.Context) -> None:
+    @app_commands.command(name="greet", description="Greet your adopted horse")
+    async def greet(self, interaction: discord.Interaction) -> None:
         """Greet an adopted horse with a lightweight personalized interaction."""
-        guild_id = ctx.guild.id if ctx.guild is not None else None
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = greet_horse_flow(
             repository=self._repository,
-            user_id=ctx.author.id,
+            user_id=interaction.user.id,
             guild_id=guild_id,
-            display_name=ctx.author.display_name,
+            display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await ctx.send(result.message)
+        await self._send_response(interaction=interaction, command_id="greet", message=result.message)
 
 
 async def setup(bot: commands.Bot) -> None:
