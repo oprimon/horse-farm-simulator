@@ -13,6 +13,7 @@ from pferdehof_bot.repositories.player_repository import CandidateRecord, Player
 
 from .candidate_generator import generate_candidate_horses
 from .moderation import contains_blocked_name_term, validate_horse_name
+from .state_presentation import build_horse_state_presentation
 from .telemetry import TelemetryLogger
 
 
@@ -632,14 +633,23 @@ def horse_profile_flow(
         trait_preview = [fallback_hint]
 
     traits_text = ", ".join(trait_preview)
+    state_presentation = build_horse_state_presentation(horse)
     lines = [
         f"Here is your horse profile, {display_name}:",
         f"Name: {horse_name}",
         f"Appearance: {appearance}",
         f"Visible traits: {traits_text}",
-        f"Mood: {horse_name} seems calm and close to you today.",
-        f"Energy: {horse_name} is ready for a gentle ride and a warm greeting.",
+        f"Mood: {horse_name} feels {state_presentation.readiness_feel}.",
+        f"Bond: {horse_name} is {state_presentation.bond_feel} with you.",
+        f"Energy: {horse_name} is {state_presentation.energy_feel}.",
+        f"Confidence: {horse_name} is {state_presentation.confidence_feel}.",
+        f"Skill: {horse_name} is {state_presentation.skill_feel}.",
     ]
+
+    if state_presentation.recent_activity_text is None:
+        lines.append("Recent activity: Nothing recent yet - try a cozy interaction like `/greet`.")
+    else:
+        lines.append(f"Recent activity: {state_presentation.recent_activity_text}")
 
     return HorseProfileResult(
         player=player,

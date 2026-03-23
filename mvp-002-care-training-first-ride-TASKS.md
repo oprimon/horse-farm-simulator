@@ -25,7 +25,7 @@ Status values:
 | T01 | Slash-command contract and loop UX copy spec | Done | Copilot | 2026-03-23 | Command contract, visibility rules, success/failure examples, and recovery guidance added to `README.md`. |
 | T02 | Slash migration and command registry foundation | Done | Copilot | 2026-03-23 | Migrated `/start`, `/horse` subcommands, and `/greet` to slash commands; added centralized command registry metadata and environment-safe command sync strategy (`off`, `guild`, `global`). Admin rename migrated as `/horse rename`. |
 | T03 | Horse state model and persistence extension | Done | Copilot | 2026-03-23 | Added schema v2 horse-state persistence, migration for MVP-001 records, state update repository API, and deterministic guild stable roster query with owner linkage. |
-| T04 | State presentation and profile text service | Not Started | Copilot | 2026-03-23 | Centralize status-band text and reusable profile rendering inputs for commands. |
+| T04 | State presentation and profile text service | Done | Copilot | 2026-03-23 | Added `state_presentation` service for readable readiness/bond/energy/confidence/skill bands; reused in `/horse` profile rendering with recent-activity text. |
 | T05 | Feed command (`/feed`) | Not Started | Copilot | 2026-03-23 | Implement first care action with adopted-horse guard and state effect. |
 | T06 | Groom command (`/groom`) | Not Started | Copilot | 2026-03-23 | Implement bonding-focused care action and response copy. |
 | T07 | Rest command (`/rest`) and recovery rules | Not Started | Copilot | 2026-03-23 | Implement recovery action and minimal pacing behavior. |
@@ -46,6 +46,7 @@ Status values:
 | 2026-03-23 | 1 | T01 | Added MVP-002 slash-command UX contract in `README.md` for `/feed`, `/groom`, `/rest`, `/train`, `/ride`, `/stable`, and updated `/horse`; documented visibility, loop order, and failure/recovery copy. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (58 passed) | Done |
 | 2026-03-23 | 2 | T02 | Added centralized command registry (`src/pferdehof_bot/command_registry.py`), migrated player-facing runtime handlers to slash commands, added startup slash sync configuration, updated README slash usage/mapping, and covered slash wiring + sync/config with tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (69 passed) | Done |
 | 2026-03-23 | 3 | T03 | Extended repository to schema v2 with persisted horse progression fields (`horse_id`, bond, energy, health, confidence, skill, action timestamps, and recent activity), added migration-safe normalization for MVP-001 records, introduced `update_horse_state` and deterministic `list_adopted_horses_by_guild` APIs, and added repository migration/roster tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (71 passed) | Done |
+| 2026-03-23 | 4 | T04 | Added new state-presentation service with consistent banded copy for readiness, bond, energy, confidence, and skill; integrated it into `/horse` profile output and added unit tests for mapping plus profile payload generation. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (78 passed) | Done |
 
 ---
 

@@ -383,6 +383,18 @@ def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
     repository.start_onboarding(user_id=702, guild_id=703, candidates=candidates)
     repository.set_chosen_candidate(user_id=702, guild_id=703, candidate_id="A")
     repository.finalize_horse_name(user_id=702, guild_id=703, name="Luna")
+    repository.update_horse_state(
+        user_id=702,
+        guild_id=703,
+        updates={
+            "bond": 80,
+            "energy": 72,
+            "health": 78,
+            "confidence": 68,
+            "skill": 61,
+            "recent_activity": "Shared a gentle arena walk.",
+        },
+    )
 
     result = horse_profile_flow(
         repository=repository,
@@ -396,8 +408,12 @@ def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
     assert "Name: Luna" in result.message
     assert "Appearance: Chestnut with bright blaze" in result.message
     assert "Visible traits: steady, curious" in result.message
-    assert "Mood: Luna" in result.message
-    assert "Energy: Luna" in result.message
+    assert "Mood: Luna feels eager and ready for a confident outing." in result.message
+    assert "Bond: Luna is deeply connected and affectionate with you." in result.message
+    assert "Energy: Luna is bright-eyed and eager to move." in result.message
+    assert "Confidence: Luna is bold and excited to try new things." in result.message
+    assert "Skill: Luna is building good habits and balance." in result.message
+    assert "Recent activity: Shared a gentle arena walk." in result.message
 
 
 def test_greet_horse_flow_requires_adopted_horse(tmp_path) -> None:
