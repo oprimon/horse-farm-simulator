@@ -44,7 +44,7 @@ Status values:
 | Date | Session | Task ID | Summary of Changes | Tests Run | Result |
 |---|---|---|---|---|---|
 | 2026-03-23 | 1 | T01 | Added MVP-002 slash-command UX contract in `README.md` for `/feed`, `/groom`, `/rest`, `/train`, `/ride`, `/stable`, and updated `/horse`; documented visibility, loop order, and failure/recovery copy. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (58 passed) | Done |
-| 2026-03-23 | 2 | T02 | Added centralized command registry (`src/pferdehof_bot/command_registry.py`), migrated player-facing runtime handlers to slash commands, added startup slash sync configuration, updated README slash usage/mapping, and covered slash wiring + sync/config with tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (to run in this session) | Done |
+| 2026-03-23 | 2 | T02 | Added centralized command registry (`src/pferdehof_bot/command_registry.py`), migrated player-facing runtime handlers to slash commands, added startup slash sync configuration, updated README slash usage/mapping, and covered slash wiring + sync/config with tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (69 passed) | Done |
 
 ---
 
