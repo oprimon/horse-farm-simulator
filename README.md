@@ -45,11 +45,12 @@ $env:DISCORD_TOKEN="your-token-here"
 
 Optional slash sync controls:
 
-- `DISCORD_COMMAND_SYNC=off|guild|global`
+- `DISCORD_COMMAND_SYNC=auto|off|guild|global`
 - `DISCORD_DEV_GUILD_ID=<numeric_guild_id>` (required when `DISCORD_COMMAND_SYNC=guild`)
 
 Recommended rollout:
 
+- Default: `DISCORD_COMMAND_SYNC=auto` to sync globally-defined commands to connected guilds at startup for immediate availability.
 - Development: `DISCORD_COMMAND_SYNC=guild` with a test guild id for fast updates.
 - Production: `DISCORD_COMMAND_SYNC=off` after commands are already registered.
 - One-time global publish: `DISCORD_COMMAND_SYNC=global` only when intentionally updating global commands.

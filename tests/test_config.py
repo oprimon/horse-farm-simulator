@@ -14,7 +14,7 @@ def test_load_config_reads_token(monkeypatch):
     config = load_config()
 
     assert config.token == "test-token"
-    assert config.command_sync_mode == "off"
+    assert config.command_sync_mode == "auto"
     assert config.command_sync_dev_guild_id is None
 
 
@@ -80,6 +80,17 @@ def test_load_config_accepts_global_command_sync(monkeypatch) -> None:
     config = load_config()
 
     assert config.command_sync_mode == "global"
+    assert config.command_sync_dev_guild_id is None
+
+
+def test_load_config_accepts_auto_command_sync(monkeypatch) -> None:
+    monkeypatch.setenv("DISCORD_TOKEN", "test-token")
+    monkeypatch.setenv("DISCORD_COMMAND_SYNC", "auto")
+    monkeypatch.delenv("DISCORD_DEV_GUILD_ID", raising=False)
+
+    config = load_config()
+
+    assert config.command_sync_mode == "auto"
     assert config.command_sync_dev_guild_id is None
 
 

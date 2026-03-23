@@ -126,3 +126,62 @@ def test_sync_application_commands_guild_sync_targets_dev_guild() -> None:
     assert len(fake_bot.tree.sync_calls) == 1
     assert fake_bot.tree.sync_calls[0] is not None
     assert fake_bot.tree.sync_calls[0].id == 123456
+
+
+def test_sync_application_commands_auto_syncs_each_connected_guild() -> None:
+    class FakeTree:
+        def __init__(self) -> None:
+            self.sync_calls: list[discord.Object | None] = []
+            self.copy_calls: list[discord.Object] = []
+
+        async def sync(self, guild: discord.Object | None = None) -> list[object]:
+            self.sync_calls.append(guild)
+            return []
+
+        def copy_global_to(self, guild: discord.Object) -> None:
+            self.copy_calls.append(guild)
+
+    class FakeGuild:
+        def __init__(self, guild_id: int) -> None:
+            self.id = guild_id
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.tree = FakeTree()
+            self.guilds = [FakeGuild(11), FakeGuild(22)]
+
+    fake_bot = FakeBot()
+    mode = asyncio.run(sync_application_commands(fake_bot, CommandSyncSettings(mode="auto")))
+
+    assert mode == "auto"
+    assert len(fake_bot.tree.copy_calls) == 2
+    assert [guild.id for guild in fake_bot.tree.copy_calls] == [11, 22]
+    assert len(fake_bot.tree.sync_calls) == 2
+    assert [guild.id for guild in fake_bot.tree.sync_calls if guild is not None] == [11, 22]
+
+
+def test_sync_application_commands_auto_falls_back_to_global_without_guilds() -> None:
+    class FakeTree:
+        def __init__(self) -> None:
+            self.sync_calls: list[discord.Object | None] = []
+            self.copy_calls: list[discord.Object] = []
+
+        async def sync(self, guild: discord.Object | None = None) -> list[object]:
+            self.sync_calls.append(guild)
+            return []
+
+        def copy_global_to(self, guild: discord.Object) -> None:
+            self.copy_calls.append(guild)
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.tree = FakeTree()
+            self.guilds = []
+
+    fake_bot = FakeBot()
+    mode = asyncio.run(sync_application_commands(fake_bot, CommandSyncSettings(mode="auto")))
+
+    assert mode == "auto"
+    assert len(fake_bot.tree.copy_calls) == 0
+    assert len(fake_bot.tree.sync_calls) == 1
+    assert fake_bot.tree.sync_calls[0] is None

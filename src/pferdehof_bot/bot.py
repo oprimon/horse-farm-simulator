@@ -18,15 +18,15 @@ DEFAULT_EXTENSIONS: tuple[str, ...] = (
 class CommandSyncSettings:
     """Configuration for startup slash-command synchronization."""
 
-    mode: str = "off"
+    mode: str = "auto"
     dev_guild_id: int | None = None
 
 
 def _normalized_sync_mode(mode: str) -> str:
     normalized = mode.strip().lower()
-    if normalized in {"off", "global", "guild"}:
+    if normalized in {"off", "global", "guild", "auto"}:
         return normalized
-    return "off"
+    return "auto"
 
 
 async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSettings) -> str:
@@ -44,6 +44,18 @@ async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSett
         guild_object = discord.Object(id=settings.dev_guild_id)
         bot.tree.copy_global_to(guild=guild_object)
         await bot.tree.sync(guild=guild_object)
+        return mode
+
+    if mode == "auto":
+        guilds = tuple(bot.guilds)
+        if len(guilds) == 0:
+            await bot.tree.sync()
+            return mode
+
+        for guild in guilds:
+            guild_object = discord.Object(id=guild.id)
+            bot.tree.copy_global_to(guild=guild_object)
+            await bot.tree.sync(guild=guild_object)
         return mode
 
     await bot.tree.sync()
