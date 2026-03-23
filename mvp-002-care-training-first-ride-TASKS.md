@@ -52,6 +52,16 @@ Status values:
 
 ## Task Details
 
+### Shared mechanical rules for T05-T10
+Apply these rules consistently in implementation and tests:
+- All state values clamp to `0..100`.
+- `increases`: always add rolled amount; clamp to `100`.
+- `decreases`: always subtract rolled amount; clamp to `0`.
+- `has a chance to increase`: roll `1d100`; if roll is higher than current checked value, apply the configured increase roll amount (for this MVP baseline, `1d10`).
+- `has a chance (<attribute>) to decrease`: roll `1d100` vs `<attribute>`; if roll is higher, decrease target stat by configured roll amount.
+- `has a slight chance (<attribute>) to decrease`: roll `1d100` twice vs `<attribute>`; if both rolls are higher, decrease target stat by configured roll amount.
+- Consistency rule: `d100` handles checks, `d10` handles stat deltas.
+
 ### T01 - Slash-command contract and loop UX copy spec
 Goal: Define exact slash-command surface and player-facing copy for the first repeatable care loop before coding behavior.
 
@@ -186,7 +196,7 @@ Goal: Add the first nurturing action that improves readiness and reinforces atta
 
 Implementation details:
 - Require adopted horse.
-- Increase health and or energy according to balancing rules.
+- Always increase energy by `1d10` (max `100`).
 - Return a short personalized response using horse name.
 - Persist timestamp and recent activity summary.
 
@@ -206,7 +216,10 @@ Goal: Add a care action that emphasizes bond and calmness.
 
 Implementation details:
 - Require adopted horse.
-- Improve bond and optionally confidence or mood.
+- Apply chance-to-increase logic to either bond or health:
+  - choose target stat (bond or health),
+  - roll `1d100` against the chosen current value,
+  - if roll is higher, increase chosen stat by `1d10` (max `100`).
 - Persist timestamp and recent activity summary.
 - Keep the result short and cozy.
 
@@ -225,7 +238,7 @@ Goal: Add the simplest pacing and recovery mechanic so actions feel like part of
 
 Implementation details:
 - Require adopted horse.
-- Restore energy and support health recovery.
+- Always increase health by `1d10` (max `100`).
 - Define minimal recovery rules and any soft pacing needed to prevent spam-only optimization.
 - Persist timestamp and recent activity summary.
 
@@ -245,8 +258,8 @@ Goal: Turn care into visible progression by adding a skill-building step with tr
 Implementation details:
 - Require adopted horse.
 - Check readiness preconditions such as minimum energy or health if used.
-- Increase skill and sometimes confidence.
-- Consume energy.
+- Chance to increase skill by `1d10` (max `100`) using `1d100` vs current skill.
+- Slight chance (skill check) to decrease health by `1d10` (min `0`) using two `1d100` rolls.
 - Persist timestamp and recent activity summary.
 
 Acceptance criteria:
@@ -289,6 +302,10 @@ Implementation details:
 - Require adopted horse.
 - Validate any ride readiness rules.
 - Use the ride outcome engine to generate response text and state changes.
+- Apply baseline state changes:
+  - chance to increase confidence or bond by `1d10` (max `100`) via `1d100` check against selected stat,
+  - always decrease energy by `3d10` (min `0`),
+  - chance (skill check) to decrease health by `1d10` (min `0`) via `1d100` vs skill.
 - Persist timestamps and recent activity.
 - Expand `/horse` to show latest activity or ride memory snippet.
 - Implement command as slash command and document response visibility choice.

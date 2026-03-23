@@ -69,22 +69,40 @@ Failure signals:
 - Keep raw numbers hidden or lightly abstracted in player-facing text.
 - Show readable status bands such as low, steady, eager, tired, or confident.
 
+### 1.1 Dice and attribute-check rules (MVP-002 baseline)
+- State values are clamped to `0..100`.
+- `increases`: always add the rolled amount and clamp to max `100`.
+- `decreases`: always subtract the rolled amount and clamp to min `0`.
+- `has a chance to increase`: roll `1d100`; if roll is higher than the current checked value, apply the configured increase roll amount (for this MVP baseline, `1d10`, max `100`).
+- `has a chance (<attribute>) to decrease`: roll `1d100` against `<attribute>`; if roll is higher than `<attribute>`, decrease the target stat by the configured decrease roll amount (min `0`).
+- `has a slight chance (<attribute>) to decrease`: roll `1d100` twice against `<attribute>`; only if both rolls are higher than `<attribute>`, decrease the target stat by the configured decrease roll amount.
+- Design note for consistency: `d100` is used for checks, while `d10` rolls are used as actual stat deltas.
+
 ### 2. Care actions
 - Add care commands:
   - `/feed`
   - `/groom`
   - `/rest`
-- Each action should improve a clear part of the horse's readiness.
+- Baseline effects:
+  - `/feed`: energy always increases by `1d10` (max `100`).
+  - `/groom`: choose bond or health, then perform a chance-to-increase check; on success increase chosen stat by `1d10` (max `100`).
+  - `/rest`: health always increases by `1d10` (max `100`).
 - Commands should be short, flavorful, and personalized to the horse's name.
 
 ### 3. Training action
 - Add `/train` as the core progress action.
-- Training should improve skill and sometimes confidence.
-- Training should usually cost energy and may require the horse not to be in a poor state.
+- Baseline effects:
+  - Chance to increase skill by `1d10` (max `100`) using a `1d100` vs current skill check.
+  - Slight chance (skill check) to decrease health by `1d10` (min `0`) using two `1d100` rolls.
+- Optional readiness gating (for example low health refusal) may still be used, but this baseline defines train risk/reward without a required guaranteed energy cost.
 
 ### 4. First ride loop
 - Add `/ride` with short text outcomes.
 - Outcomes should depend on current horse state and recent actions.
+- Baseline state effects:
+  - Chance to increase confidence or bond by `1d10` (max `100`) using a `1d100` check against the selected target stat.
+  - Energy always decreases by `3d10` (min `0`).
+  - Chance (skill check) to decrease health by `1d10` (min `0`) using `1d100` vs skill.
 - Early ride results should skew wholesome and encouraging.
 - Occasional soft setbacks are allowed, but should feel recoverable rather than punishing.
 
