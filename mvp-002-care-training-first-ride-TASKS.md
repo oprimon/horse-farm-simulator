@@ -35,7 +35,7 @@ Status values:
 | T11 | Stable roster command (`/stable`) | Done | Copilot | 2026-03-25 | Added slash `/stable` with guild-scoped roster rendering, stable sorting, owner display-name resolution, and empty-state guidance. |
 | T12 | Telemetry and loop instrumentation | Done | Copilot | 2026-03-25 | Added MVP-002 loop telemetry events (`fed_horse`, `groomed_horse`, `rested_horse`, `trained_horse`, `rode_horse`, `ride_outcome`, `viewed_stable`) with consistent payload dimensions and docs. |
 | T13 | Integration tests and loop balance validation | Done | Copilot | 2026-03-25 | Added MVP-002 integration tests for happy path care->train->ride journey, stable roster/guild scope, pre-adoption and poor-state guardrails, and persistence across repository reload. |
-| T14 | MVP exit validation and backlog handoff | Not Started | Copilot | 2026-03-23 | Add README exit checklist and capture next-step recommendation for MVP-003. |
+| T14 | MVP exit validation and backlog handoff | Done | Copilot | 2026-03-25 | Added README MVP-002 exit checklist with pass/fail evidence, MVP-003 recommendation, and next session start command. |
 
 ---
 
@@ -55,6 +55,7 @@ Status values:
 | 2026-03-25 | 11 | T11 | Added `StableRosterResult` and `stable_roster_flow` in `onboarding.py` for guild-scoped stable rendering with owner display-name resolution and empty-state handling; added `/stable` slash command in `CoreCog`; registered `stable` in `command_registry.py`; exported from `services/__init__.py`; added onboarding service, slash registration, and registry tests for stable behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (124 passed) | Done |
 | 2026-03-25 | 12 | T12 | Extended telemetry contract for MVP-002 loop fields (`horse_name`, `outcome_id`, `outcome_category`), emitted new events from successful `/feed`, `/groom`, `/rest`, `/train`, `/ride`, and `/stable` flows, documented telemetry payload shape and analysis usage in `README.md`, expanded telemetry summary script loop reporting, and added unit tests for event emission and payload keys. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (128 passed) | Done |
 | 2026-03-25 | 13 | T13 | Added `tests/test_mvp002_integration.py` with integration-style coverage for happy path (`/feed` -> `/groom` -> `/train` -> `/ride` -> `/horse` -> `/stable`), failure paths (command before adoption, `/train` poor-state refusal), persistence after repository reload, and stable roster guild scoping correctness. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q tests/test_mvp002_integration.py` (3 passed); `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (131 passed) | Done |
+| 2026-03-25 | 14 | T14 | Added MVP-002 exit checklist in `README.md` with evidence-backed pass/fail criteria, added MVP-003 handoff recommendation plus explicit next session start command, and added `tests/test_readme_mvp002_exit.py` to validate required docs anchors. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (133 passed) | Done |
 
 ---
 

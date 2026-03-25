@@ -156,11 +156,37 @@ Migration mapping from prefix to slash:
 - `!horse rename` -> `/horse rename`
 - `!greet` -> `/greet`
 
-## Planned Features
+## MVP-002 Exit Checklist
 
-The following features are planned for upcoming development:
-- Integration tests for the full MVP-002 loop and persistence reload paths
-- MVP-002 exit checklist and MVP-003 recommendation handoff
+Status date: 2026-03-25
+
+1. PASS: Adopted players can use care commands, train, and ride reliably.
+Evidence: Slash commands `/feed`, `/groom`, `/rest`, `/train`, and `/ride` are implemented with adopter/readiness guardrails and covered by integration tests in `tests/test_mvp002_integration.py`.
+2. PASS: Horse state changes persist across restarts.
+Evidence: Horse state persistence and migration behavior are implemented in the repository layer and verified by repository and integration tests, including reload coverage in `tests/test_mvp002_integration.py`.
+3. PASS: Ride outcomes visibly reflect horse state.
+Evidence: Weighted ride outcomes are produced by `src/pferdehof_bot/services/ride_outcomes.py` and consumed by ride flow logic with deterministic branch coverage in `tests/test_ride_outcomes.py` and onboarding service tests.
+4. PASS: Telemetry captures enough data to measure loop completion and repeat usage.
+Evidence: MVP-002 loop events (`fed_horse`, `groomed_horse`, `rested_horse`, `trained_horse`, `rode_horse`, `ride_outcome`, `viewed_stable`) are emitted and validated in `tests/test_telemetry.py`; analysis command is documented in this README.
+5. PASS: The resulting loop is strong enough to justify MVP-003.
+Evidence: Full MVP-002 feature slice (care, train, ride, stable, persistence, and telemetry) is complete and validated by the full pytest suite recorded in the task history.
+
+## MVP-003 Handoff Recommendation
+
+Recommendation: MVP-003 should prioritize shared stable memories and light cooperative stable interactions before expanding complexity (economy, breeding, or deep admin tooling).
+
+Reasoning:
+- MVP-002 already validates the solo attachment loop and state progression.
+- Telemetry now supports measuring whether social features improve multi-day retention.
+- Memory and cooperative moments are a natural extension of the cozy tone without increasing system burden too early.
+
+Next session start command (MVP-003 planning):
+
+```bash
+d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q
+```
+
+Then open `mvp-002-care-training-first-ride.md` and draft the MVP-003 planning note focused on shared memories and cooperative stable interactions.
 
 ## Data and Persistence
 
