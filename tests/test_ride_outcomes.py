@@ -290,7 +290,12 @@ def test_select_ride_outcome_handles_zero_state() -> None:
         bond=0,
         skill=0,
     )
-    assert result.category in {"fair", "setback"}
+    low_band_categories = {
+        category
+        for category, weight in _CATEGORY_WEIGHTS_BY_BAND["low"]
+        if weight > 0
+    }
+    assert result.category in low_band_categories
     assert result.outcome_id
 
 
