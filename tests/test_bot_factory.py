@@ -1,10 +1,12 @@
 """Tests for bot factory setup."""
 
 import asyncio
+from types import SimpleNamespace
 
 import discord
 from discord.ext import commands
 
+import pferdehof_bot.bot as bot_module
 from pferdehof_bot.bot import CommandSyncSettings, create_bot, sync_application_commands
 
 
@@ -192,3 +194,24 @@ def test_sync_application_commands_auto_falls_back_to_global_without_guilds() ->
     assert len(fake_bot.tree.copy_calls) == 0
     assert len(fake_bot.tree.sync_calls) == 1
     assert fake_bot.tree.sync_calls[0] is None
+
+
+def test_on_ready_syncs_commands_only_once_per_process(monkeypatch) -> None:
+    sync_calls = 0
+
+    async def fake_sync_application_commands(
+        bot: commands.Bot, settings: CommandSyncSettings
+    ) -> str:
+        nonlocal sync_calls
+        sync_calls += 1
+        return "auto"
+
+    monkeypatch.setattr(bot_module, "sync_application_commands", fake_sync_application_commands)
+
+    bot = create_bot(command_sync_settings=CommandSyncSettings(mode="auto"))
+    bot._connection.user = SimpleNamespace(id=123, name="TestBot")
+
+    asyncio.run(bot.on_ready())
+    asyncio.run(bot.on_ready())
+
+    assert sync_calls == 1

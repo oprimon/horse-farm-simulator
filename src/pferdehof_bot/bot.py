@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -72,15 +73,28 @@ def create_bot(
 
     bot = commands.Bot(command_prefix=command_prefix, intents=intents)
     sync_settings = command_sync_settings or CommandSyncSettings()
+    command_sync_completed = False
+    command_sync_lock = asyncio.Lock()
 
     @bot.event
     async def on_ready() -> None:
+        nonlocal command_sync_completed
         username = str(bot.user) if bot.user is not None else "Unknown"
         user_id = bot.user.id if bot.user is not None else "Unknown"
         print(f"Logged in as {username} (ID: {user_id})")
         print("------")
-        sync_mode = await sync_application_commands(bot, sync_settings)
-        print(f"Command sync mode: {sync_mode}")
+        if command_sync_completed:
+            print("Command sync mode: skipped (already synced this process)")
+            return
+
+        async with command_sync_lock:
+            if command_sync_completed:
+                print("Command sync mode: skipped (already synced this process)")
+                return
+
+            sync_mode = await sync_application_commands(bot, sync_settings)
+            command_sync_completed = True
+            print(f"Command sync mode: {sync_mode}")
 
     return bot
 
