@@ -15,6 +15,7 @@ from pferdehof_bot.repositories.player_repository import CandidateRecord, Player
 
 from .candidate_generator import generate_candidate_horses
 from .moderation import contains_blocked_name_term, validate_horse_name
+from .ride_outcomes import RideOutcomeResult, select_ride_outcome
 from .state_presentation import build_horse_state_presentation
 from .telemetry import TelemetryLogger
 
@@ -125,6 +126,21 @@ class TrainHorseResult:
     skill_gain: int
     confidence_gain: int
     energy_cost: int
+    health_loss: int
+
+
+@dataclass(frozen=True)
+class RideHorseResult:
+    """Result payload for `/ride` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+    outcome: RideOutcomeResult | None
+    ride_stat: str | None
+    """The stat subject to the chance-to-increase check: 'confidence' or 'bond'."""
+    ride_stat_gain: int
+    energy_loss: int
     health_loss: int
 
 
@@ -1060,6 +1076,120 @@ def train_horse_flow(
     )
 
 
+def ride_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+    stat_selector: Callable[[], str] | None = None,
+    d100_roll: Callable[[], int] | None = None,
+    d10_roll: Callable[[], int] | None = None,
+    rng: random.Random | None = None,
+) -> RideHorseResult:
+    """Take an adopted horse on a ride and persist the outcome as recent activity."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"There is no horse to ride yet, {display_name}. "
+            "Start your adoption journey with `/start`."
+        )
+        return RideHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+            outcome=None,
+            ride_stat=None,
+            ride_stat_gain=0,
+            energy_loss=0,
+            health_loss=0,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    current_energy = _clamp_stat(int(horse.get("energy") or 0))
+    current_health = _clamp_stat(int(horse.get("health") or 0))
+    current_skill = _clamp_stat(int(horse.get("skill") or 0))
+    current_confidence = _clamp_stat(int(horse.get("confidence") or 0))
+    current_bond = _clamp_stat(int(horse.get("bond") or 0))
+
+    # Select the stat to try and increase (confidence or bond).
+    selected_stat = stat_selector() if stat_selector is not None else random.choice(("confidence", "bond"))
+    if selected_stat not in {"confidence", "bond"}:
+        selected_stat = "confidence"
+    current_selected_value = current_confidence if selected_stat == "confidence" else current_bond
+
+    # Use the ride outcome engine to generate story text.
+    outcome = select_ride_outcome(
+        horse_name=horse_name,
+        energy=current_energy,
+        confidence=current_confidence,
+        bond=current_bond,
+        skill=current_skill,
+        rng=rng,
+    )
+
+    # Chance to increase selected stat (confidence or bond) via 1d100 check.
+    ride_stat_gain = _chance_to_increase(
+        current_value=current_selected_value,
+        d100_roll=d100_roll,
+        d10_roll=d10_roll,
+    )
+
+    # Energy always decreases by 3d10 (min 0).
+    roll_1 = d10_roll() if d10_roll is not None else _roll_d10()
+    roll_2 = d10_roll() if d10_roll is not None else _roll_d10()
+    roll_3 = d10_roll() if d10_roll is not None else _roll_d10()
+    energy_loss = _clamp_stat(roll_1 + roll_2 + roll_3, minimum=3, maximum=30)
+
+    # Chance (skill check) to decrease health via 1d100 vs skill.
+    health_loss = _chance_to_decrease(
+        checked_value=current_skill,
+        d100_roll=d100_roll,
+        d10_roll=d10_roll,
+    )
+
+    updated_selected = _clamp_stat(current_selected_value + ride_stat_gain)
+    updated_energy = _clamp_stat(current_energy - energy_loss)
+    updated_health = _clamp_stat(current_health - health_loss)
+
+    recent_activity = outcome.recent_activity_text
+    updates: dict[str, object] = {
+        selected_stat: updated_selected,
+        "energy": updated_energy,
+        "health": updated_health,
+        "last_rode_at": _timestamp_now(),
+        "recent_activity": recent_activity,
+    }
+    updated_player = repository.update_horse_state(
+        user_id=user_id,
+        guild_id=guild_id,
+        updates=updates,
+    )
+
+    result_parts: list[str] = []
+    if ride_stat_gain > 0:
+        result_parts.append(f"+{ride_stat_gain} {selected_stat}")
+    result_parts.append(f"-{energy_loss} energy")
+    if health_loss > 0:
+        result_parts.append(f"-{health_loss} health")
+    result_summary = ", ".join(result_parts)
+
+    message = (
+        f"{outcome.story_text}\n\n"
+        f"({result_summary}) Use `/horse` to see {horse_name}'s updated profile."
+    )
+    return RideHorseResult(
+        player=updated_player,
+        message=message,
+        has_adopted_horse=True,
+        outcome=outcome,
+        ride_stat=selected_stat,
+        ride_stat_gain=ride_stat_gain,
+        energy_loss=energy_loss,
+        health_loss=health_loss,
+    )
+
+
 def _emit_telemetry(
     telemetry_logger: TelemetryLogger | None,
     event_name: str,
@@ -1098,6 +1228,19 @@ def _chance_to_increase(
 
     rolled_gain = d10_roll() if d10_roll is not None else _roll_d10()
     return _clamp_stat(rolled_gain, minimum=1, maximum=10)
+
+
+def _chance_to_decrease(
+    checked_value: int,
+    d100_roll: Callable[[], int] | None,
+    d10_roll: Callable[[], int] | None,
+) -> int:
+    """Roll 1d100 against checked_value; if roll exceeds it, return a 1d10 loss amount."""
+    check_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
+    if check_roll <= checked_value:
+        return 0
+    rolled_loss = d10_roll() if d10_roll is not None else _roll_d10()
+    return _clamp_stat(rolled_loss, minimum=1, maximum=10)
 
 
 def _slight_chance_to_decrease(

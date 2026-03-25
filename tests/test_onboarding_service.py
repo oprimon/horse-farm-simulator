@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     admin_rename_horse_flow,
@@ -12,6 +14,7 @@ from pferdehof_bot.services import (
     horse_profile_flow,
     name_horse_flow,
     rest_horse_flow,
+    ride_horse_flow,
     start_onboarding_flow,
     train_horse_flow,
     view_candidates_flow,
@@ -1054,4 +1057,256 @@ def test_train_horse_flow_can_apply_slight_health_loss(tmp_path) -> None:
     assert persisted["horse"]["energy"] == 47
     assert persisted["horse"]["health"] == 33
     assert "-7 health" in str(persisted["horse"]["recent_activity"])
+
+
+# ---------------------------------------------------------------------------
+# ride_horse_flow tests
+# ---------------------------------------------------------------------------
+
+
+def _make_adopted_repo_for_riding(tmp_path, user_id: int = 950, guild_id: int = 951) -> JsonPlayerRepository:
+    """Helper: create a repository with a fully adopted player ready to ride."""
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Curious", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Brave", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=user_id, guild_id=guild_id, candidates=candidates)
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="A")
+    repository.finalize_horse_name(user_id=user_id, guild_id=guild_id, name="Maple")
+    return repository
+
+
+def test_ride_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=950,
+        guild_id=951,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert result.outcome is None
+    assert result.ride_stat is None
+    assert result.ride_stat_gain == 0
+    assert result.energy_loss == 0
+    assert result.health_loss == 0
+    assert "There is no horse to ride yet" in result.message
+    assert "/start" in result.message
+
+
+def test_ride_horse_flow_stat_gain_and_energy_loss_no_health_loss(tmp_path) -> None:
+    """Confidence increases, energy drops by 3d10, health unaffected (skill check passes)."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=952, guild_id=953)
+    repository.update_horse_state(
+        user_id=952,
+        guild_id=953,
+        updates={"confidence": 20, "bond": 30, "skill": 50, "energy": 60, "health": 70},
+    )
+
+    # d100[0]=90 > confidence(20) → gain; d10[0]=5 → gain=5
+    # d10[1]=4, d10[2]=3, d10[3]=2 → energy_loss=9
+    # d100[1]=30 <= skill(50) → no health loss
+    d100_iter = iter([90, 30])
+    d10_iter = iter([5, 4, 3, 2])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=952,
+        guild_id=953,
+        display_name="Mia",
+        stat_selector=lambda: "confidence",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(42),
+    )
+
+    assert result.has_adopted_horse is True
+    assert result.ride_stat == "confidence"
+    assert result.ride_stat_gain == 5
+    assert result.energy_loss == 9
+    assert result.health_loss == 0
+    assert result.outcome is not None
+
+    # Message contains outcome narrative and stat summary.
+    assert "-9 energy" in result.message
+    assert "+5 confidence" in result.message
+    assert "/horse" in result.message
+
+    persisted = repository.get_player(user_id=952, guild_id=953)
+    assert persisted is not None
+    assert persisted["horse"]["confidence"] == 25
+    assert persisted["horse"]["energy"] == 51
+    assert persisted["horse"]["health"] == 70
+    assert persisted["horse"]["last_rode_at"] is not None
+    assert persisted["horse"]["recent_activity"] is not None
+
+
+def test_ride_horse_flow_no_stat_gain_with_health_loss(tmp_path) -> None:
+    """Bond check fails (no gain), energy drops, health drops due to low skill."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=954, guild_id=955)
+    repository.update_horse_state(
+        user_id=954,
+        guild_id=955,
+        updates={"confidence": 20, "bond": 30, "skill": 10, "energy": 60, "health": 70},
+    )
+
+    # d100[0]=5 <= bond(30) → no gain, no d10 consumed for gain
+    # d10[0]=4, d10[1]=3, d10[2]=2 → energy_loss=9
+    # d100[1]=90 > skill(10) → health loss; d10[3]=7
+    d100_iter = iter([5, 90])
+    d10_iter = iter([4, 3, 2, 7])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=954,
+        guild_id=955,
+        display_name="Mia",
+        stat_selector=lambda: "bond",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(42),
+    )
+
+    assert result.has_adopted_horse is True
+    assert result.ride_stat == "bond"
+    assert result.ride_stat_gain == 0
+    assert result.energy_loss == 9
+    assert result.health_loss == 7
+
+    assert "-9 energy" in result.message
+    assert "-7 health" in result.message
+    assert "+0" not in result.message
+
+    persisted = repository.get_player(user_id=954, guild_id=955)
+    assert persisted is not None
+    assert persisted["horse"]["bond"] == 30
+    assert persisted["horse"]["energy"] == 51
+    assert persisted["horse"]["health"] == 63
+    assert persisted["horse"]["last_rode_at"] is not None
+
+
+def test_ride_horse_flow_energy_clamped_to_zero(tmp_path) -> None:
+    """Energy loss exceeding current energy clamps to 0."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=956, guild_id=957)
+    repository.update_horse_state(
+        user_id=956,
+        guild_id=957,
+        updates={"confidence": 20, "bond": 30, "skill": 80, "energy": 5, "health": 60},
+    )
+
+    # d100[0]=5 <= confidence(20) → no gain
+    # d10[0]=10, d10[1]=10, d10[2]=10 → energy_loss=30
+    # d100[1]=50 <= skill(80) → no health loss
+    d100_iter = iter([5, 50])
+    d10_iter = iter([10, 10, 10])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=956,
+        guild_id=957,
+        display_name="Mia",
+        stat_selector=lambda: "confidence",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(1),
+    )
+
+    assert result.energy_loss == 30
+    persisted = repository.get_player(user_id=956, guild_id=957)
+    assert persisted is not None
+    assert persisted["horse"]["energy"] == 0
+
+
+def test_ride_horse_flow_bond_can_increase(tmp_path) -> None:
+    """Bond is the selected stat and increases successfully."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=958, guild_id=959)
+    repository.update_horse_state(
+        user_id=958,
+        guild_id=959,
+        updates={"confidence": 50, "bond": 10, "skill": 80, "energy": 70, "health": 80},
+    )
+
+    # d100[0]=95 > bond(10) → gain; d10[0]=8
+    # d10[1]=3, d10[2]=2, d10[3]=1 → energy_loss=6
+    # d100[1]=40 <= skill(80) → no health loss
+    d100_iter = iter([95, 40])
+    d10_iter = iter([8, 3, 2, 1])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=958,
+        guild_id=959,
+        display_name="Mia",
+        stat_selector=lambda: "bond",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(7),
+    )
+
+    assert result.ride_stat == "bond"
+    assert result.ride_stat_gain == 8
+    assert result.energy_loss == 6
+
+    persisted = repository.get_player(user_id=958, guild_id=959)
+    assert persisted is not None
+    assert persisted["horse"]["bond"] == 18
+    assert persisted["horse"]["energy"] == 64
+
+
+def test_ride_horse_flow_recent_activity_is_outcome_text(tmp_path) -> None:
+    """recent_activity stored in horse matches the ride outcome's recent_activity_text."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=960, guild_id=961)
+    repository.update_horse_state(
+        user_id=960,
+        guild_id=961,
+        updates={"confidence": 80, "bond": 80, "skill": 80, "energy": 90, "health": 90},
+    )
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=960,
+        guild_id=961,
+        display_name="Mia",
+        rng=random.Random(123),
+    )
+
+    assert result.outcome is not None
+    persisted = repository.get_player(user_id=960, guild_id=961)
+    assert persisted is not None
+    assert persisted["horse"]["recent_activity"] == result.outcome.recent_activity_text
+
+
+def test_ride_horse_flow_horse_profile_shows_ride_recent_activity(tmp_path) -> None:
+    """After /ride, /horse profile shows the ride's recent activity snippet."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=962, guild_id=963)
+    repository.update_horse_state(
+        user_id=962,
+        guild_id=963,
+        updates={"confidence": 50, "bond": 50, "skill": 50, "energy": 70, "health": 70},
+    )
+
+    ride_result = ride_horse_flow(
+        repository=repository,
+        user_id=962,
+        guild_id=963,
+        display_name="Mia",
+        rng=random.Random(99),
+    )
+
+    profile_result = horse_profile_flow(
+        repository=repository,
+        user_id=962,
+        guild_id=963,
+        display_name="Mia",
+    )
+
+    assert ride_result.outcome is not None
+    # The recent activity from the ride should appear in the horse profile.
+    assert ride_result.outcome.recent_activity_text in profile_result.message
+
 
