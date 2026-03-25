@@ -12,6 +12,7 @@ from .onboarding import (
 	NameHorseResult,
 	RestHorseResult,
 	StartOnboardingResult,
+	TrainHorseResult,
 	ViewCandidatesResult,
 	admin_rename_horse_flow,
 	choose_candidate_flow,
@@ -22,6 +23,7 @@ from .onboarding import (
 	name_horse_flow,
 	rest_horse_flow,
 	start_onboarding_flow,
+	train_horse_flow,
 	view_candidates_flow,
 )
 from .state_presentation import HorseStatePresentation, build_horse_state_presentation
@@ -41,6 +43,7 @@ __all__ = [
 	"NameHorseResult",
 	"RestHorseResult",
 	"StartOnboardingResult",
+	"TrainHorseResult",
 	"ViewCandidatesResult",
 	"admin_rename_horse_flow",
 	"choose_candidate_flow",
@@ -51,6 +54,7 @@ __all__ = [
 	"name_horse_flow",
 	"rest_horse_flow",
 	"start_onboarding_flow",
+	"train_horse_flow",
 	"view_candidates_flow",
 	"HorseStatePresentation",
 	"build_horse_state_presentation",

@@ -29,7 +29,7 @@ Status values:
 | T05 | Feed command (`/feed`) | Done | Copilot | 2026-03-25 | Added slash `/feed` flow with adopter guard, `1d10` energy gain clamped to `100`, and persisted `last_fed_at` plus `recent_activity`. |
 | T06 | Groom command (`/groom`) | Done | Copilot | 2026-03-25 | Added slash `/groom` with adopted-horse guard, chance-based `bond` or `health` increase via `1d100` check and `1d10` delta, and persisted `last_groomed_at` plus `recent_activity`. |
 | T07 | Rest command (`/rest`) and recovery rules | Done | Copilot | 2026-03-25 | Added slash `/rest` with adopted-horse guard, `1d10` health gain clamped to `100`, and persisted `last_rested_at` plus `recent_activity`. |
-| T08 | Training command (`/train`) and progression rules | Not Started | Copilot | 2026-03-23 | Add skill/confidence progression with energy cost and readable feedback. |
+| T08 | Training command (`/train`) and progression rules | Done | Copilot | 2026-03-25 | Added slash `/train` with readiness guards, chance-based skill and confidence gains, `1d10` energy cost, slight skill-based health risk, and readable `/ride` guidance. |
 | T09 | Ride outcome engine and content tables | Not Started | Copilot | 2026-03-23 | Build weighted ride outcomes based on horse state with mostly positive early-tone results. |
 | T10 | Ride command (`/ride`) and recent-activity persistence | Not Started | Copilot | 2026-03-23 | Wire slash ride command, persist recent result text, and update `/horse` output. |
 | T11 | Stable roster command (`/stable`) | Not Started | Copilot | 2026-03-23 | Add slash stable command that lists horse ids, horse names, and owner display names for the guild. |
@@ -50,6 +50,7 @@ Status values:
 | 2026-03-25 | 5 | T05 | Implemented slash `/feed` in `CoreCog`, added `feed_horse_flow` with adopted-horse guard and deterministic `1d10` energy delta handling, persisted `last_fed_at` + `recent_activity`, and extended slash/registry and service tests for feed behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (80 passed) | Done |
 | 2026-03-25 | 6 | T06 | Implemented slash `/groom` in `CoreCog`, added `groom_horse_flow` with adopted-horse guard and chance-based `bond`/`health` progression (`1d100` check, `1d10` gain), persisted `last_groomed_at` + `recent_activity`, and extended slash/registry and onboarding service tests for grooming behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (83 passed) | Done |
 | 2026-03-25 | 7 | T07 | Implemented slash `/rest` in `CoreCog`, added `rest_horse_flow` with adopted-horse guard and always-apply `1d10` health gain (clamped to `100`), persisted `last_rested_at` + `recent_activity`, and added slash/registry and onboarding service tests for rest behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (87 passed) | Done |
+| 2026-03-25 | 8 | T08 | Implemented slash `/train` in `CoreCog`, added `train_horse_flow` with adopted-horse guard, readiness refusal for low energy or health, chance-based skill and confidence progression, `1d10` energy cost, slight skill-based health-loss risk, persisted `last_trained_at` + `recent_activity`, and extended slash/registry and onboarding service tests for training behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (91 passed) | Done |
 
 ---
 

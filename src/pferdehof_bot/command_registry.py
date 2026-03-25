@@ -86,6 +86,12 @@ COMMAND_REGISTRY: dict[str, CommandMetadata] = {
         subcommand_name=None,
         visibility=ResponseVisibility.CHANNEL,
     ),
+    "train": CommandMetadata(
+        identifier="train",
+        command_name="train",
+        subcommand_name=None,
+        visibility=ResponseVisibility.CHANNEL,
+    ),
 }
 
 

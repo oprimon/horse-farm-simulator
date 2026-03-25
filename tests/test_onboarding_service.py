@@ -13,6 +13,7 @@ from pferdehof_bot.services import (
     name_horse_flow,
     rest_horse_flow,
     start_onboarding_flow,
+    train_horse_flow,
     view_candidates_flow,
 )
 
@@ -900,4 +901,157 @@ def test_rest_horse_flow_returns_no_adopted_horse_for_unadopted_player(tmp_path)
     assert result.has_adopted_horse is False
     assert result.health_gain == 0
     assert "/start" in result.message
+
+
+# ---------------------------------------------------------------------------
+# T08 – train_horse_flow
+# ---------------------------------------------------------------------------
+
+def _make_adopted_repo_for_training(tmp_path, user_id: int = 940, guild_id: int = 941) -> JsonPlayerRepository:
+    """Helper: create a repository with a fully adopted player."""
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Curious", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Brave", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=user_id, guild_id=guild_id, candidates=candidates)
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="A")
+    repository.finalize_horse_name(user_id=user_id, guild_id=guild_id, name="Maple")
+    return repository
+
+
+def test_train_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = train_horse_flow(
+        repository=repository,
+        user_id=940,
+        guild_id=941,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert result.blocked_by_readiness is False
+    assert result.skill_gain == 0
+    assert result.confidence_gain == 0
+    assert result.energy_cost == 0
+    assert result.health_loss == 0
+    assert "There is no horse to train yet" in result.message
+    assert "/start" in result.message
+
+
+def test_train_horse_flow_refuses_when_energy_or_health_is_too_low(tmp_path) -> None:
+    repository = _make_adopted_repo_for_training(tmp_path, user_id=942, guild_id=943)
+    repository.update_horse_state(
+        user_id=942,
+        guild_id=943,
+        updates={"energy": 24, "health": 80, "last_trained_at": None, "recent_activity": None},
+    )
+
+    result = train_horse_flow(
+        repository=repository,
+        user_id=942,
+        guild_id=943,
+        display_name="Mia",
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.blocked_by_readiness is True
+    assert result.skill_gain == 0
+    assert result.confidence_gain == 0
+    assert result.energy_cost == 0
+    assert result.health_loss == 0
+    assert "hold off on training Maple" in result.message
+    assert "/feed" in result.message
+    assert "/rest" in result.message
+
+    persisted = repository.get_player(user_id=942, guild_id=943)
+    assert persisted is not None
+    assert persisted["horse"]["energy"] == 24
+    assert persisted["horse"]["last_trained_at"] is None
+    assert persisted["horse"]["recent_activity"] is None
+
+
+def test_train_horse_flow_updates_skill_confidence_and_energy(tmp_path) -> None:
+    repository = _make_adopted_repo_for_training(tmp_path, user_id=944, guild_id=945)
+    repository.update_horse_state(
+        user_id=944,
+        guild_id=945,
+        updates={"skill": 20, "confidence": 30, "energy": 70, "health": 80},
+    )
+    d100_rolls = iter([87, 92, 14, 9])
+    d10_rolls = iter([6, 4, 5])
+
+    result = train_horse_flow(
+        repository=repository,
+        user_id=944,
+        guild_id=945,
+        display_name="Mia",
+        d100_roll=lambda: next(d100_rolls),
+        d10_roll=lambda: next(d10_rolls),
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.blocked_by_readiness is False
+    assert result.skill_gain == 6
+    assert result.confidence_gain == 4
+    assert result.energy_cost == 5
+    assert result.health_loss == 0
+    assert "You guide Maple through a focused training session, Mia." in result.message
+    assert "+6 skill, +4 confidence, -5 energy" in result.message
+    assert "/ride" in result.message
+
+    persisted = repository.get_player(user_id=944, guild_id=945)
+    assert persisted is not None
+    assert persisted["horse"]["skill"] == 26
+    assert persisted["horse"]["confidence"] == 34
+    assert persisted["horse"]["energy"] == 65
+    assert persisted["horse"]["health"] == 80
+    assert persisted["horse"]["last_trained_at"] is not None
+    assert "You trained Maple" in str(persisted["horse"]["recent_activity"])
+    assert "+6 skill" in str(persisted["horse"]["recent_activity"])
+    assert "+4 confidence" in str(persisted["horse"]["recent_activity"])
+    assert "-5 energy" in str(persisted["horse"]["recent_activity"])
+
+
+def test_train_horse_flow_can_apply_slight_health_loss(tmp_path) -> None:
+    repository = _make_adopted_repo_for_training(tmp_path, user_id=946, guild_id=947)
+    repository.update_horse_state(
+        user_id=946,
+        guild_id=947,
+        updates={"skill": 12, "confidence": 20, "energy": 50, "health": 8},
+    )
+    repository.update_horse_state(
+        user_id=946,
+        guild_id=947,
+        updates={"health": 40},
+    )
+    d100_rolls = iter([10, 5, 91, 88])
+    d10_rolls = iter([3, 7])
+
+    result = train_horse_flow(
+        repository=repository,
+        user_id=946,
+        guild_id=947,
+        display_name="Mia",
+        d100_roll=lambda: next(d100_rolls),
+        d10_roll=lambda: next(d10_rolls),
+    )
+
+    assert result.blocked_by_readiness is False
+    assert result.skill_gain == 0
+    assert result.confidence_gain == 0
+    assert result.energy_cost == 3
+    assert result.health_loss == 7
+    assert "-7 health" in result.message
+
+    persisted = repository.get_player(user_id=946, guild_id=947)
+    assert persisted is not None
+    assert persisted["horse"]["energy"] == 47
+    assert persisted["horse"]["health"] == 33
+    assert "-7 health" in str(persisted["horse"]["recent_activity"])
 

@@ -19,6 +19,7 @@ from pferdehof_bot.services import (
     name_horse_flow,
     rest_horse_flow,
     start_onboarding_flow,
+    train_horse_flow,
     view_candidates_flow,
 )
 
@@ -189,6 +190,19 @@ class CoreCog(commands.Cog):
             display_name=display_name,
         )
         await self._send_response(interaction=interaction, command_id="rest", message=result.message)
+
+    @app_commands.command(name="train", description="Train your adopted horse to build skill and confidence")
+    async def train(self, interaction: discord.Interaction) -> None:
+        """Train an adopted horse with progression, readiness checks, and tradeoffs."""
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        result = train_horse_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            guild_id=guild_id,
+            display_name=display_name,
+        )
+        await self._send_response(interaction=interaction, command_id="train", message=result.message)
 
 
 async def setup(bot: commands.Bot) -> None:
