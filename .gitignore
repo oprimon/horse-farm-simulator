@@ -19,3 +19,6 @@ coverage.xml
 
 # Local environment files
 .env
+
+# Local archive attachments
+horsesim.zip
