@@ -14,7 +14,7 @@ def test_load_config_reads_token(monkeypatch):
     config = load_config()
 
     assert config.token == "test-token"
-    assert config.command_sync_mode == "auto"
+    assert config.command_sync_mode == "global"
     assert config.command_sync_dev_guild_id is None
 
 

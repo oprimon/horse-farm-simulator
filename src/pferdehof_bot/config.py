@@ -51,9 +51,9 @@ def load_config() -> BotConfig:
     if not token:
         raise ConfigError("DISCORD_TOKEN is not set.")
 
-    sync_mode = os.getenv("DISCORD_COMMAND_SYNC", "auto").strip().lower()
+    sync_mode = os.getenv("DISCORD_COMMAND_SYNC", "global").strip().lower()
     if sync_mode not in {"off", "global", "guild", "auto"}:
-        sync_mode = "auto"
+        sync_mode = "global"
 
     dev_guild_raw = os.getenv("DISCORD_DEV_GUILD_ID", "").strip()
     if dev_guild_raw:

@@ -50,7 +50,7 @@ Optional slash sync controls:
 
 Recommended rollout:
 
-- Default: `DISCORD_COMMAND_SYNC=auto` to sync globally-defined commands to connected guilds at startup for immediate availability.
+- Default: `DISCORD_COMMAND_SYNC=global` to publish globally-defined commands at startup.
 - Development: `DISCORD_COMMAND_SYNC=guild` with a test guild id for fast updates.
 - Production: `DISCORD_COMMAND_SYNC=off` after commands are already registered.
 - One-time global publish: `DISCORD_COMMAND_SYNC=global` only when intentionally updating global commands.

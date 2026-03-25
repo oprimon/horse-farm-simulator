@@ -51,6 +51,34 @@ class CoreCog(commands.Cog):
         is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
         await interaction.response.send_message(message, ephemeral=is_ephemeral)
 
+    async def _build_owner_display_name_map(
+        self,
+        guild: discord.Guild,
+        owner_user_ids: set[int],
+        interaction_user_id: int,
+        interaction_display_name: str,
+    ) -> dict[int, str]:
+        """Resolve owner names with guild-display priority and API fallback."""
+        resolved_names: dict[int, str] = {}
+        for owner_user_id in owner_user_ids:
+            if owner_user_id == interaction_user_id:
+                resolved_names[owner_user_id] = interaction_display_name
+                continue
+
+            member = guild.get_member(owner_user_id)
+            if member is not None:
+                resolved_names[owner_user_id] = getattr(member, "display_name", member.name)
+                continue
+
+            try:
+                fetched_member = await guild.fetch_member(owner_user_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                continue
+
+            resolved_names[owner_user_id] = getattr(fetched_member, "display_name", fetched_member.name)
+
+        return resolved_names
+
     @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
     async def start(self, interaction: discord.Interaction) -> None:
         """Start or resume player onboarding for horse adoption."""
@@ -231,15 +259,19 @@ class CoreCog(commands.Cog):
         guild_id = guild.id if guild is not None else None
         display_name = getattr(interaction.user, "display_name", interaction.user.name)
 
+        owner_display_names: dict[int, str] = {}
+        if guild is not None and guild_id is not None:
+            raw_rows = self._repository.list_adopted_horses_by_guild(guild_id=guild_id)
+            owner_user_ids = {int(raw_row["owner_user_id"]) for raw_row in raw_rows}
+            owner_display_names = await self._build_owner_display_name_map(
+                guild=guild,
+                owner_user_ids=owner_user_ids,
+                interaction_user_id=interaction.user.id,
+                interaction_display_name=display_name,
+            )
+
         def owner_display_name_resolver(owner_user_id: int) -> str | None:
-            if guild is None:
-                return None
-
-            member = guild.get_member(owner_user_id)
-            if member is None:
-                return None
-
-            return getattr(member, "display_name", member.name)
+            return owner_display_names.get(owner_user_id)
 
         result = stable_roster_flow(
             repository=self._repository,

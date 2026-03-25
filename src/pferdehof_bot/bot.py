@@ -19,7 +19,7 @@ DEFAULT_EXTENSIONS: tuple[str, ...] = (
 class CommandSyncSettings:
     """Configuration for startup slash-command synchronization."""
 
-    mode: str = "auto"
+    mode: str = "global"
     dev_guild_id: int | None = None
 
 
@@ -27,7 +27,7 @@ def _normalized_sync_mode(mode: str) -> str:
     normalized = mode.strip().lower()
     if normalized in {"off", "global", "guild", "auto"}:
         return normalized
-    return "auto"
+    return "global"
 
 
 async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSettings) -> str:
