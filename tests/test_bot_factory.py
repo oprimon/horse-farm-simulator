@@ -58,6 +58,7 @@ def test_sync_application_commands_global_syncs_tree() -> None:
         def __init__(self) -> None:
             self.sync_calls: list[discord.Object | None] = []
             self.copy_calls: list[discord.Object] = []
+            self.clear_calls: list[discord.Object] = []
 
         async def sync(self, guild: discord.Object | None = None) -> list[object]:
             self.sync_calls.append(guild)
@@ -66,16 +67,26 @@ def test_sync_application_commands_global_syncs_tree() -> None:
         def copy_global_to(self, guild: discord.Object) -> None:
             self.copy_calls.append(guild)
 
+        def clear_commands(self, guild: discord.Object | None = None) -> None:
+            if guild is not None:
+                self.clear_calls.append(guild)
+
+    class FakeGuild:
+        def __init__(self, guild_id: int) -> None:
+            self.id = guild_id
+
     class FakeBot:
         def __init__(self) -> None:
             self.tree = FakeTree()
+            self.guilds = [FakeGuild(11), FakeGuild(22)]
 
     fake_bot = FakeBot()
     mode = asyncio.run(sync_application_commands(fake_bot, CommandSyncSettings(mode="global")))
 
     assert mode == "global"
-    assert len(fake_bot.tree.sync_calls) == 1
-    assert fake_bot.tree.sync_calls[0] is None
+    assert [guild.id for guild in fake_bot.tree.clear_calls] == [11, 22]
+    assert [guild.id for guild in fake_bot.tree.sync_calls if guild is not None] == [11, 22]
+    assert fake_bot.tree.sync_calls[-1] is None
     assert len(fake_bot.tree.copy_calls) == 0
 
 
@@ -84,6 +95,7 @@ def test_sync_application_commands_guild_sync_requires_guild_id() -> None:
         def __init__(self) -> None:
             self.sync_calls: list[discord.Object | None] = []
             self.copy_calls: list[discord.Object] = []
+            self.clear_calls: list[discord.Object] = []
 
         async def sync(self, guild: discord.Object | None = None) -> list[object]:
             self.sync_calls.append(guild)
@@ -91,6 +103,10 @@ def test_sync_application_commands_guild_sync_requires_guild_id() -> None:
 
         def copy_global_to(self, guild: discord.Object) -> None:
             self.copy_calls.append(guild)
+
+        def clear_commands(self, guild: discord.Object | None = None) -> None:
+            if guild is not None:
+                self.clear_calls.append(guild)
 
     class FakeBot:
         def __init__(self) -> None:
@@ -102,6 +118,7 @@ def test_sync_application_commands_guild_sync_requires_guild_id() -> None:
     assert mode == "off"
     assert len(fake_bot.tree.sync_calls) == 0
     assert len(fake_bot.tree.copy_calls) == 0
+    assert len(fake_bot.tree.clear_calls) == 0
 
 
 def test_sync_application_commands_guild_sync_targets_dev_guild() -> None:
@@ -109,6 +126,7 @@ def test_sync_application_commands_guild_sync_targets_dev_guild() -> None:
         def __init__(self) -> None:
             self.sync_calls: list[discord.Object | None] = []
             self.copy_calls: list[discord.Object] = []
+            self.clear_calls: list[discord.Object] = []
 
         async def sync(self, guild: discord.Object | None = None) -> list[object]:
             self.sync_calls.append(guild)
@@ -116,6 +134,10 @@ def test_sync_application_commands_guild_sync_targets_dev_guild() -> None:
 
         def copy_global_to(self, guild: discord.Object) -> None:
             self.copy_calls.append(guild)
+
+        def clear_commands(self, guild: discord.Object | None = None) -> None:
+            if guild is not None:
+                self.clear_calls.append(guild)
 
     class FakeBot:
         def __init__(self) -> None:
@@ -135,6 +157,7 @@ def test_sync_application_commands_guild_sync_targets_dev_guild() -> None:
     assert len(fake_bot.tree.sync_calls) == 1
     assert fake_bot.tree.sync_calls[0] is not None
     assert fake_bot.tree.sync_calls[0].id == 123456
+    assert len(fake_bot.tree.clear_calls) == 0
 
 
 def test_sync_application_commands_auto_syncs_each_connected_guild() -> None:
@@ -142,6 +165,7 @@ def test_sync_application_commands_auto_syncs_each_connected_guild() -> None:
         def __init__(self) -> None:
             self.sync_calls: list[discord.Object | None] = []
             self.copy_calls: list[discord.Object] = []
+            self.clear_calls: list[discord.Object] = []
 
         async def sync(self, guild: discord.Object | None = None) -> list[object]:
             self.sync_calls.append(guild)
@@ -149,6 +173,10 @@ def test_sync_application_commands_auto_syncs_each_connected_guild() -> None:
 
         def copy_global_to(self, guild: discord.Object) -> None:
             self.copy_calls.append(guild)
+
+        def clear_commands(self, guild: discord.Object | None = None) -> None:
+            if guild is not None:
+                self.clear_calls.append(guild)
 
     class FakeGuild:
         def __init__(self, guild_id: int) -> None:
@@ -167,6 +195,7 @@ def test_sync_application_commands_auto_syncs_each_connected_guild() -> None:
     assert [guild.id for guild in fake_bot.tree.copy_calls] == [11, 22]
     assert len(fake_bot.tree.sync_calls) == 2
     assert [guild.id for guild in fake_bot.tree.sync_calls if guild is not None] == [11, 22]
+    assert len(fake_bot.tree.clear_calls) == 0
 
 
 def test_sync_application_commands_auto_falls_back_to_global_without_guilds() -> None:
@@ -174,6 +203,7 @@ def test_sync_application_commands_auto_falls_back_to_global_without_guilds() ->
         def __init__(self) -> None:
             self.sync_calls: list[discord.Object | None] = []
             self.copy_calls: list[discord.Object] = []
+            self.clear_calls: list[discord.Object] = []
 
         async def sync(self, guild: discord.Object | None = None) -> list[object]:
             self.sync_calls.append(guild)
@@ -181,6 +211,10 @@ def test_sync_application_commands_auto_falls_back_to_global_without_guilds() ->
 
         def copy_global_to(self, guild: discord.Object) -> None:
             self.copy_calls.append(guild)
+
+        def clear_commands(self, guild: discord.Object | None = None) -> None:
+            if guild is not None:
+                self.clear_calls.append(guild)
 
     class FakeBot:
         def __init__(self) -> None:
@@ -194,6 +228,7 @@ def test_sync_application_commands_auto_falls_back_to_global_without_guilds() ->
     assert len(fake_bot.tree.copy_calls) == 0
     assert len(fake_bot.tree.sync_calls) == 1
     assert fake_bot.tree.sync_calls[0] is None
+    assert len(fake_bot.tree.clear_calls) == 0
 
 
 def test_on_ready_syncs_commands_only_once_per_process(monkeypatch) -> None:

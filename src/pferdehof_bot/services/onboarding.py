@@ -1238,7 +1238,7 @@ def ride_horse_flow(
 
     message = (
         f"{outcome.story_text}\n\n"
-        f"({result_summary}) Use `/horse` to see {horse_name}'s updated profile."
+        f"({result_summary})\n\nUse `/horse profile` to see {horse_name}'s updated profile."
     )
     return RideHorseResult(
         player=updated_player,

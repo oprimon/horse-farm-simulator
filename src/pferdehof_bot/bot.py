@@ -47,6 +47,16 @@ async def sync_application_commands(bot: commands.Bot, settings: CommandSyncSett
         await bot.tree.sync(guild=guild_object)
         return mode
 
+    if mode == "global":
+        # Remove stale guild-scoped command copies so only global commands remain.
+        for guild in tuple(bot.guilds):
+            guild_object = discord.Object(id=guild.id)
+            bot.tree.clear_commands(guild=guild_object)
+            await bot.tree.sync(guild=guild_object)
+
+        await bot.tree.sync()
+        return mode
+
     if mode == "auto":
         guilds = tuple(bot.guilds)
         if len(guilds) == 0:
