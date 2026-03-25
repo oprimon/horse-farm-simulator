@@ -94,6 +94,17 @@ class FeedHorseResult:
 
 
 @dataclass(frozen=True)
+class GroomHorseResult:
+    """Result payload for `/groom` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+    groomed_stat: str | None
+    stat_gain: int
+
+
+@dataclass(frozen=True)
 class AdminRenameHorseResult:
     """Result payload for admin `horse rename` override command."""
 
@@ -769,6 +780,77 @@ def feed_horse_flow(
     )
 
 
+def groom_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+    stat_selector: Callable[[], str] | None = None,
+    d100_roll: Callable[[], int] | None = None,
+    d10_roll: Callable[[], int] | None = None,
+) -> GroomHorseResult:
+    """Groom an adopted horse with a chance to increase bond or health."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"There is no horse to groom yet, {display_name}. "
+            "Start your adoption journey with `/start`."
+        )
+        return GroomHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+            groomed_stat=None,
+            stat_gain=0,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    selected_stat = stat_selector() if stat_selector is not None else random.choice(("bond", "health"))
+    if selected_stat not in {"bond", "health"}:
+        selected_stat = "bond"
+
+    current_value = _clamp_stat(int(horse.get(selected_stat) or 0))
+    check_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
+
+    stat_gain = 0
+    if check_roll > current_value:
+        rolled_gain = d10_roll() if d10_roll is not None else _roll_d10()
+        stat_gain = _clamp_stat(rolled_gain, minimum=1, maximum=10)
+
+    updated_value = _clamp_stat(current_value + stat_gain)
+    stat_label = "bond" if selected_stat == "bond" else "health"
+
+    if stat_gain > 0:
+        reaction_text = (
+            f"{horse_name} melts into the brushing and seems noticeably calmer (+{stat_gain} {stat_label})."
+        )
+    else:
+        reaction_text = (
+            f"{horse_name} relaxes into the grooming routine. It is a quiet, comforting moment today."
+        )
+
+    recent_activity = f"You groomed {horse_name}. {reaction_text}"
+    updated_player = repository.update_horse_state(
+        user_id=user_id,
+        guild_id=guild_id,
+        updates={
+            selected_stat: updated_value,
+            "last_groomed_at": _timestamp_now(),
+            "recent_activity": recent_activity,
+        },
+    )
+
+    message = f"You groom {horse_name} carefully, {display_name}. {reaction_text}"
+    return GroomHorseResult(
+        player=updated_player,
+        message=message,
+        has_adopted_horse=True,
+        groomed_stat=selected_stat,
+        stat_gain=stat_gain,
+    )
+
+
 def _emit_telemetry(
     telemetry_logger: TelemetryLogger | None,
     event_name: str,
@@ -789,6 +871,11 @@ def _emit_telemetry(
 def _roll_d10() -> int:
     """Return a uniform d10 roll for state deltas."""
     return random.randint(1, 10)
+
+
+def _roll_d100() -> int:
+    """Return a uniform d100 roll for chance-based checks."""
+    return random.randint(1, 100)
 
 
 def _clamp_stat(value: int, minimum: int = 0, maximum: int = 100) -> int:

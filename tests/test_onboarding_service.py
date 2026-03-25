@@ -8,6 +8,7 @@ from pferdehof_bot.services import (
     choose_candidate_flow,
     feed_horse_flow,
     greet_horse_flow,
+    groom_horse_flow,
     horse_profile_flow,
     name_horse_flow,
     start_onboarding_flow,
@@ -541,6 +542,132 @@ def test_feed_horse_flow_updates_energy_and_recent_activity(tmp_path) -> None:
     assert persisted["horse"]["last_fed_at"] is not None
     assert persisted["horse"]["recent_activity"] is not None
     assert "You fed Luna" in persisted["horse"]["recent_activity"]
+
+
+def test_groom_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = groom_horse_flow(
+        repository=repository,
+        user_id=824,
+        guild_id=825,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert result.groomed_stat is None
+    assert result.stat_gain == 0
+    assert "There is no horse to groom yet" in result.message
+    assert "/start" in result.message
+
+
+def test_groom_horse_flow_increases_selected_stat_when_check_passes(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {
+            "id": "A",
+            "appearance_text": "Chestnut with bright blaze",
+            "hint": "Curious",
+            "template_seed": 1,
+        },
+        {
+            "id": "B",
+            "appearance_text": "Bay with white socks",
+            "hint": "Calm",
+            "template_seed": 2,
+        },
+        {
+            "id": "C",
+            "appearance_text": "Grey with tiny star",
+            "hint": "Brave",
+            "template_seed": 3,
+        },
+    ]
+    repository.start_onboarding(user_id=826, guild_id=827, candidates=candidates)
+    repository.set_chosen_candidate(user_id=826, guild_id=827, candidate_id="A")
+    repository.finalize_horse_name(user_id=826, guild_id=827, name="Luna")
+    repository.update_horse_state(
+        user_id=826,
+        guild_id=827,
+        updates={"bond": 95},
+    )
+
+    result = groom_horse_flow(
+        repository=repository,
+        user_id=826,
+        guild_id=827,
+        display_name="Mia",
+        stat_selector=lambda: "bond",
+        d100_roll=lambda: 99,
+        d10_roll=lambda: 8,
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.groomed_stat == "bond"
+    assert result.stat_gain == 8
+    assert "You groom Luna carefully, Mia." in result.message
+    assert "+8 bond" in result.message
+
+    persisted = repository.get_player(user_id=826, guild_id=827)
+    assert persisted is not None
+    assert persisted["horse"]["bond"] == 100
+    assert persisted["horse"]["last_groomed_at"] is not None
+    assert "You groomed Luna" in str(persisted["horse"]["recent_activity"])
+
+
+def test_groom_horse_flow_keeps_selected_stat_when_check_fails(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {
+            "id": "A",
+            "appearance_text": "Chestnut with bright blaze",
+            "hint": "Curious",
+            "template_seed": 1,
+        },
+        {
+            "id": "B",
+            "appearance_text": "Bay with white socks",
+            "hint": "Calm",
+            "template_seed": 2,
+        },
+        {
+            "id": "C",
+            "appearance_text": "Grey with tiny star",
+            "hint": "Brave",
+            "template_seed": 3,
+        },
+    ]
+    repository.start_onboarding(user_id=828, guild_id=829, candidates=candidates)
+    repository.set_chosen_candidate(user_id=828, guild_id=829, candidate_id="A")
+    repository.finalize_horse_name(user_id=828, guild_id=829, name="Luna")
+    repository.update_horse_state(
+        user_id=828,
+        guild_id=829,
+        updates={"health": 88},
+    )
+
+    result = groom_horse_flow(
+        repository=repository,
+        user_id=828,
+        guild_id=829,
+        display_name="Mia",
+        stat_selector=lambda: "health",
+        d100_roll=lambda: 12,
+        d10_roll=lambda: 10,
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.groomed_stat == "health"
+    assert result.stat_gain == 0
+    assert "quiet, comforting moment" in result.message
+
+    persisted = repository.get_player(user_id=828, guild_id=829)
+    assert persisted is not None
+    assert persisted["horse"]["health"] == 88
+    assert persisted["horse"]["last_groomed_at"] is not None
 
 
 # ---------------------------------------------------------------------------

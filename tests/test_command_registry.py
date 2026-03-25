@@ -17,6 +17,7 @@ def test_command_registry_includes_required_slash_surface() -> None:
         "horse.rename",
         "greet",
         "feed",
+        "groom",
     }
 
     assert required_ids.issubset(set(COMMAND_REGISTRY.keys()))
@@ -38,3 +39,8 @@ def test_command_registry_admin_and_visibility_metadata() -> None:
     assert feed_metadata.command_name == "feed"
     assert feed_metadata.subcommand_name is None
     assert feed_metadata.requires_admin is False
+
+    groom_metadata = get_command_metadata("groom")
+    assert groom_metadata.command_name == "groom"
+    assert groom_metadata.subcommand_name is None
+    assert groom_metadata.requires_admin is False
