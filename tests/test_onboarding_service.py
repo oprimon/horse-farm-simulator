@@ -11,6 +11,7 @@ from pferdehof_bot.services import (
     groom_horse_flow,
     horse_profile_flow,
     name_horse_flow,
+    rest_horse_flow,
     start_onboarding_flow,
     view_candidates_flow,
 )
@@ -790,4 +791,113 @@ def test_horse_rename_subcommand_requires_administrator_permission() -> None:
     assert rename_cmd is not None, "horse rename subcommand must be registered"
     assert rename_cmd.default_permissions is not None, "horse rename must include default permissions"
     assert rename_cmd.default_permissions.administrator is True
+
+
+# ---------------------------------------------------------------------------
+# T07 – rest_horse_flow
+# ---------------------------------------------------------------------------
+
+def _make_adopted_repo_for_rest(tmp_path, user_id: int = 930, guild_id: int = 931) -> JsonPlayerRepository:
+    """Helper: create a repository with a fully adopted player."""
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Curious", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Brave", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=user_id, guild_id=guild_id, candidates=candidates)
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="A")
+    repository.finalize_horse_name(user_id=user_id, guild_id=guild_id, name="Ember")
+    return repository
+
+
+def test_rest_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = rest_horse_flow(
+        repository=repository,
+        user_id=930,
+        guild_id=931,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert result.health_gain == 0
+    assert "There is no horse to rest yet" in result.message
+    assert "/start" in result.message
+
+
+def test_rest_horse_flow_updates_health_and_recent_activity(tmp_path) -> None:
+    repository = _make_adopted_repo_for_rest(tmp_path, user_id=932, guild_id=933)
+    repository.update_horse_state(
+        user_id=932,
+        guild_id=933,
+        updates={"health": 88},
+    )
+
+    result = rest_horse_flow(
+        repository=repository,
+        user_id=932,
+        guild_id=933,
+        display_name="Mia",
+        d10_roll=lambda: 6,
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.health_gain == 6
+    assert "You settle Ember in for a comfortable rest, Mia." in result.message
+    assert "+6 health" in result.message
+
+    persisted = repository.get_player(user_id=932, guild_id=933)
+    assert persisted is not None
+    assert persisted["horse"]["health"] == 94
+    assert persisted["horse"]["last_rested_at"] is not None
+    assert "recent_activity" in persisted["horse"]
+    assert "Ember rested quietly" in persisted["horse"]["recent_activity"]
+    assert "+6 health" in persisted["horse"]["recent_activity"]
+
+
+def test_rest_horse_flow_clamps_health_at_100(tmp_path) -> None:
+    repository = _make_adopted_repo_for_rest(tmp_path, user_id=934, guild_id=935)
+    repository.update_horse_state(
+        user_id=934,
+        guild_id=935,
+        updates={"health": 97},
+    )
+
+    result = rest_horse_flow(
+        repository=repository,
+        user_id=934,
+        guild_id=935,
+        display_name="Mia",
+        d10_roll=lambda: 10,
+    )
+
+    assert result.health_gain == 10
+    persisted = repository.get_player(user_id=934, guild_id=935)
+    assert persisted is not None
+    assert persisted["horse"]["health"] == 100
+
+
+def test_rest_horse_flow_returns_no_adopted_horse_for_unadopted_player(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut with bright blaze", "hint": "Curious", "template_seed": 1},
+        {"id": "B", "appearance_text": "Bay with white socks", "hint": "Calm", "template_seed": 2},
+        {"id": "C", "appearance_text": "Grey with tiny star", "hint": "Brave", "template_seed": 3},
+    ]
+    repository.start_onboarding(user_id=936, guild_id=937, candidates=candidates)
+
+    result = rest_horse_flow(
+        repository=repository,
+        user_id=936,
+        guild_id=937,
+        display_name="Mia",
+    )
+
+    assert result.has_adopted_horse is False
+    assert result.health_gain == 0
+    assert "/start" in result.message
 

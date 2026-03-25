@@ -17,6 +17,7 @@ from pferdehof_bot.services import (
     groom_horse_flow,
     horse_profile_flow,
     name_horse_flow,
+    rest_horse_flow,
     start_onboarding_flow,
     view_candidates_flow,
 )
@@ -175,6 +176,19 @@ class CoreCog(commands.Cog):
             display_name=display_name,
         )
         await self._send_response(interaction=interaction, command_id="groom", message=result.message)
+
+    @app_commands.command(name="rest", description="Let your adopted horse rest and recover health")
+    async def rest(self, interaction: discord.Interaction) -> None:
+        """Rest an adopted horse and persist the latest recovery activity."""
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        result = rest_horse_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            guild_id=guild_id,
+            display_name=display_name,
+        )
+        await self._send_response(interaction=interaction, command_id="rest", message=result.message)
 
 
 async def setup(bot: commands.Bot) -> None:

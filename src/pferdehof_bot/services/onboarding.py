@@ -105,6 +105,16 @@ class GroomHorseResult:
 
 
 @dataclass(frozen=True)
+class RestHorseResult:
+    """Result payload for `/rest` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+    health_gain: int
+
+
+@dataclass(frozen=True)
 class AdminRenameHorseResult:
     """Result payload for admin `horse rename` override command."""
 
@@ -848,6 +858,59 @@ def groom_horse_flow(
         has_adopted_horse=True,
         groomed_stat=selected_stat,
         stat_gain=stat_gain,
+    )
+
+
+def rest_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+    d10_roll: Callable[[], int] | None = None,
+) -> RestHorseResult:
+    """Rest an adopted horse to restore health and persist recent activity."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"There is no horse to rest yet, {display_name}. "
+            "Start your adoption journey with `/start`."
+        )
+        return RestHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+            health_gain=0,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    current_health = int(horse.get("health") or 0)
+    roll = d10_roll() if d10_roll is not None else _roll_d10()
+    health_gain = _clamp_stat(roll, minimum=1, maximum=10)
+    updated_health = _clamp_stat(current_health + health_gain)
+    recent_activity = (
+        f"{horse_name} rested quietly in the stable and feels healthier (+{health_gain} health)."
+    )
+
+    updated_player = repository.update_horse_state(
+        user_id=user_id,
+        guild_id=guild_id,
+        updates={
+            "health": updated_health,
+            "last_rested_at": _timestamp_now(),
+            "recent_activity": recent_activity,
+        },
+    )
+
+    message = (
+        f"You settle {horse_name} in for a comfortable rest, {display_name}. "
+        f"{horse_name} dozes peacefully and wakes up feeling better (+{health_gain} health)."
+    )
+    return RestHorseResult(
+        player=updated_player,
+        message=message,
+        has_adopted_horse=True,
+        health_gain=health_gain,
     )
 
 

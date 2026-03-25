@@ -80,6 +80,12 @@ COMMAND_REGISTRY: dict[str, CommandMetadata] = {
         subcommand_name=None,
         visibility=ResponseVisibility.CHANNEL,
     ),
+    "rest": CommandMetadata(
+        identifier="rest",
+        command_name="rest",
+        subcommand_name=None,
+        visibility=ResponseVisibility.CHANNEL,
+    ),
 }
 
 
