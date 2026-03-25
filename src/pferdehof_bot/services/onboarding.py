@@ -179,7 +179,7 @@ def start_onboarding_flow(
 
     if existing_player is not None and bool(existing_player.get("adopted", False)):
         message = (
-            f"You already have a horse, {display_name}. "
+            "You already have a horse. "
             "You can visit them with `/horse` and say hello with `/greet`."
         )
         return StartOnboardingResult(
@@ -193,7 +193,7 @@ def start_onboarding_flow(
         if existing_player is None:
             raise RuntimeError("Unexpected missing player during active onboarding check.")
         message = (
-            f"Your adoption journey is already underway, {display_name}. "
+            "Your adoption journey is already underway. "
             "Use `/horse view` to see your candidates."
         )
         return StartOnboardingResult(
@@ -217,7 +217,7 @@ def start_onboarding_flow(
     )
 
     message = (
-        f"Welcome to Pferdehof, {display_name}. "
+        "Welcome to Pferdehof. "
         "Three horses are waiting to meet you. Use `/horse view` to see your candidates."
     )
     return StartOnboardingResult(
@@ -246,7 +246,7 @@ def view_candidates_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None:
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return ViewCandidatesResult(
@@ -258,7 +258,7 @@ def view_candidates_flow(
 
     if bool(player.get("adopted", False)):
         message = (
-            f"You already adopted your horse, {display_name}. "
+            "You already adopted your horse. "
             "Visit them with `/horse` and say hello with `/greet`."
         )
         return ViewCandidatesResult(
@@ -271,7 +271,7 @@ def view_candidates_flow(
     session = player.get("onboarding_session") or {}
     if not bool(session.get("active", False)):
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return ViewCandidatesResult(
@@ -295,7 +295,7 @@ def view_candidates_flow(
         )
 
     lines = [
-        f"Here are your horse candidates, {display_name}:",
+        "Here are your horse candidates:",
         "",
     ]
     for candidate in candidates:
@@ -338,7 +338,7 @@ def choose_candidate_flow(
     valid_ids = {"A", "B", "C"}
     if normalized_candidate_id not in valid_ids:
         message = (
-            f"That candidate id is not valid, {display_name}. "
+            "That candidate id is not valid. "
             "Please choose A, B, or C using `/horse choose <id>`."
         )
         return ChooseCandidateResult(
@@ -354,7 +354,7 @@ def choose_candidate_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None:
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return ChooseCandidateResult(
@@ -369,7 +369,7 @@ def choose_candidate_flow(
 
     if bool(player.get("adopted", False)):
         message = (
-            f"You already adopted your horse, {display_name}. "
+            "You already adopted your horse. "
             "Visit them with `/horse` and say hello with `/greet`."
         )
         return ChooseCandidateResult(
@@ -385,7 +385,7 @@ def choose_candidate_flow(
     session = player.get("onboarding_session") or {}
     if not bool(session.get("active", False)):
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return ChooseCandidateResult(
@@ -401,7 +401,7 @@ def choose_candidate_flow(
     chosen_candidate_id = session.get("chosen_candidate_id")
     if chosen_candidate_id:
         message = (
-            f"Your choice is already locked to {str(chosen_candidate_id).upper()}, {display_name}. "
+            f"Your choice is already locked to {str(chosen_candidate_id).upper()}. "
             "In this MVP, choices are irreversible. Continue with `/horse name <name>`."
         )
         return ChooseCandidateResult(
@@ -418,7 +418,7 @@ def choose_candidate_flow(
     candidate_ids = {str(candidate.get("id", "")).upper() for candidate in candidates}
     if normalized_candidate_id not in candidate_ids:
         message = (
-            f"I could not find candidate {normalized_candidate_id}, {display_name}. "
+            f"I could not find candidate {normalized_candidate_id}. "
             "Use `/horse view` to see your current A/B/C options."
         )
         return ChooseCandidateResult(
@@ -444,7 +444,7 @@ def choose_candidate_flow(
         candidate_id=normalized_candidate_id,
     )
     message = (
-        f"Wonderful choice, {display_name}. Candidate {normalized_candidate_id} is now locked in. "
+        f"Wonderful choice. Candidate {normalized_candidate_id} is now locked in. "
         "Give your horse a name with `/horse name <name>`."
     )
     return ChooseCandidateResult(
@@ -470,7 +470,7 @@ def name_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None:
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return NameHorseResult(
@@ -485,7 +485,7 @@ def name_horse_flow(
 
     if bool(player.get("adopted", False)):
         message = (
-            f"You already adopted your horse, {display_name}. "
+            "You already adopted your horse. "
             "Visit them with `/horse` and say hello with `/greet`."
         )
         return NameHorseResult(
@@ -501,7 +501,7 @@ def name_horse_flow(
     session = player.get("onboarding_session") or {}
     if not bool(session.get("active", False)):
         message = (
-            f"No adoption session is active yet, {display_name}. "
+            "No adoption session is active yet. "
             "Use `/start` to begin your horse journey."
         )
         return NameHorseResult(
@@ -517,7 +517,7 @@ def name_horse_flow(
     chosen_candidate_id = session.get("chosen_candidate_id")
     if not chosen_candidate_id:
         message = (
-            f"Choose your horse first, {display_name}. "
+            "Choose your horse first. "
             "Use `/horse choose <id>` before naming your horse."
         )
         return NameHorseResult(
@@ -533,7 +533,7 @@ def name_horse_flow(
     normalized_name, name_error = validate_horse_name(horse_name)
     if name_error == "length":
         message = (
-            f"That name needs to be between 2 and 20 characters, {display_name}. "
+            "That name needs to be between 2 and 20 characters. "
             "Try `/horse name <name>` with a shorter or longer name."
         )
         return NameHorseResult(
@@ -554,7 +554,7 @@ def name_horse_flow(
             normalized_name,
         )
         message = (
-            f"That name cannot be used, {display_name}. "
+            "That name cannot be used. "
             "Please choose a kinder name with `/horse name <name>`."
         )
         return NameHorseResult(
@@ -583,7 +583,7 @@ def name_horse_flow(
     appearance = str(horse.get("appearance", "a wonderful horse"))
     hint = _normalize_hint_text(horse.get("hint"), fallback="Steady-hearted and kind.")
     message = (
-        f"What a beautiful name, {display_name}. {normalized_name} is officially your horse now. "
+        f"What a beautiful name. {normalized_name} is officially your horse now. "
         f"Appearance: {appearance}. "
         f"First impression: {hint} "
         "Your adoption is complete."
@@ -681,12 +681,12 @@ def horse_profile_flow(
         onboarding_session = (player or {}).get("onboarding_session") or {}
         if bool(onboarding_session.get("active", False)):
             message = (
-                f"You have not adopted a horse yet, {display_name}. "
+                "You have not adopted a horse yet. "
                 "Use `/horse view` to review your candidates, or `/start` to restart onboarding."
             )
         else:
             message = (
-                f"You do not have a horse yet, {display_name}. "
+                "You do not have a horse yet. "
                 "Use `/start` to begin your adoption journey."
             )
         return HorseProfileResult(
@@ -709,7 +709,7 @@ def horse_profile_flow(
     traits_text = ", ".join(trait_preview)
     state_presentation = build_horse_state_presentation(horse)
     lines = [
-        f"Here is your horse profile, {display_name}:",
+        "Here is your horse profile:",
         f"Name: {horse_name}",
         f"Appearance: {appearance}",
         f"Visible traits: {traits_text}",
@@ -743,7 +743,7 @@ def greet_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to greet yet, {display_name}. "
+            "There is no horse to greet yet. "
             "Start your adoption journey with `/start`."
         )
         return GreetHorseResult(
@@ -792,7 +792,7 @@ def feed_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to feed yet, {display_name}. "
+            "There is no horse to feed yet. "
             "Start your adoption journey with `/start`."
         )
         return FeedHorseResult(
@@ -830,7 +830,7 @@ def feed_horse_flow(
     )
 
     message = (
-        f"You offer a warm feed to {horse_name}, {display_name}. "
+        f"You offer a warm feed to {horse_name}. "
         f"{horse_name} munches happily and feels brighter (+{energy_gain} energy)."
     )
     return FeedHorseResult(
@@ -855,7 +855,7 @@ def groom_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to groom yet, {display_name}. "
+            "There is no horse to groom yet. "
             "Start your adoption journey with `/start`."
         )
         return GroomHorseResult(
@@ -910,7 +910,7 @@ def groom_horse_flow(
         horse_name=horse_name,
     )
 
-    message = f"You groom {horse_name} carefully, {display_name}. {reaction_text}"
+    message = f"You groom {horse_name} carefully. {reaction_text}"
     return GroomHorseResult(
         player=updated_player,
         message=message,
@@ -932,7 +932,7 @@ def rest_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to rest yet, {display_name}. "
+            "There is no horse to rest yet. "
             "Start your adoption journey with `/start`."
         )
         return RestHorseResult(
@@ -970,7 +970,7 @@ def rest_horse_flow(
     )
 
     message = (
-        f"You settle {horse_name} in for a comfortable rest, {display_name}. "
+        f"You settle {horse_name} in for a comfortable rest. "
         f"{horse_name} dozes peacefully and wakes up feeling better (+{health_gain} health)."
     )
     return RestHorseResult(
@@ -994,7 +994,7 @@ def train_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to train yet, {display_name}. "
+            "There is no horse to train yet. "
             "Start your adoption journey with `/start`."
         )
         return TrainHorseResult(
@@ -1019,7 +1019,7 @@ def train_horse_flow(
         state_presentation = build_horse_state_presentation(horse)
         recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/train`."
         message = (
-            f"You hold off on training {horse_name} for now, {display_name}. "
+            f"You hold off on training {horse_name} for now. "
             f"{horse_name} feels {state_presentation.readiness_feel}. {recovery_guidance}"
         )
         return TrainHorseResult(
@@ -1105,7 +1105,7 @@ def train_horse_flow(
     result_summary = ", ".join(result_parts)
 
     message = (
-        f"You guide {horse_name} through a focused training session, {display_name}. "
+        f"You guide {horse_name} through a focused training session. "
         f"{horse_name} comes away {state_presentation.skill_feel} and {state_presentation.confidence_feel} ({result_summary}). "
         f"If {horse_name} still feels ready later, `/ride` is the next natural step."
     )
@@ -1136,7 +1136,7 @@ def ride_horse_flow(
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
     if player is None or not bool(player.get("adopted", False)):
         message = (
-            f"There is no horse to ride yet, {display_name}. "
+            "There is no horse to ride yet. "
             "Start your adoption journey with `/start`."
         )
         return RideHorseResult(
@@ -1263,7 +1263,7 @@ def stable_roster_flow(
     """Render the adopted-horse roster for the current guild."""
     if guild_id is None:
         message = (
-            f"The stable roster needs a server stable to look at, {display_name}. "
+            "The stable roster needs a server stable to look at. "
             "Use `/stable` from a guild channel."
         )
         return StableRosterResult(
@@ -1276,7 +1276,7 @@ def stable_roster_flow(
     raw_rows = repository.list_adopted_horses_by_guild(guild_id=guild_id)
     if not raw_rows:
         message = (
-            f"The stable is still quiet in this server, {display_name}. "
+            "The stable is still quiet in this server. "
             "No horses have been adopted here yet. Use `/start` to welcome the first one."
         )
         return StableRosterResult(
@@ -1287,7 +1287,7 @@ def stable_roster_flow(
         )
 
     rows: list[dict[str, object]] = []
-    lines = [f"Here is the current stable roster, {display_name}:"]
+    lines = ["Here is the current stable roster:"]
     for raw_row in raw_rows:
         owner_user_id = int(raw_row["owner_user_id"])
         owner_display_name = _resolve_owner_display_name(

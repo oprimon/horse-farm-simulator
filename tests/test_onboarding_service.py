@@ -540,7 +540,7 @@ def test_feed_horse_flow_updates_energy_and_recent_activity(tmp_path) -> None:
     assert result.player is not None
     assert result.has_adopted_horse is True
     assert result.energy_gain == 7
-    assert "You offer a warm feed to Luna, Mia." in result.message
+    assert "You offer a warm feed to Luna." in result.message
     assert "+7 energy" in result.message
 
     persisted = repository.get_player(user_id=822, guild_id=823)
@@ -614,7 +614,7 @@ def test_groom_horse_flow_increases_selected_stat_when_check_passes(tmp_path) ->
     assert result.has_adopted_horse is True
     assert result.groomed_stat == "bond"
     assert result.stat_gain == 8
-    assert "You groom Luna carefully, Mia." in result.message
+    assert "You groom Luna carefully." in result.message
     assert "+8 bond" in result.message
 
     persisted = repository.get_player(user_id=826, guild_id=827)
@@ -853,7 +853,7 @@ def test_rest_horse_flow_updates_health_and_recent_activity(tmp_path) -> None:
     assert result.player is not None
     assert result.has_adopted_horse is True
     assert result.health_gain == 6
-    assert "You settle Ember in for a comfortable rest, Mia." in result.message
+    assert "You settle Ember in for a comfortable rest." in result.message
     assert "+6 health" in result.message
 
     persisted = repository.get_player(user_id=932, guild_id=933)
@@ -1006,7 +1006,7 @@ def test_train_horse_flow_updates_skill_confidence_and_energy(tmp_path) -> None:
     assert result.confidence_gain == 4
     assert result.energy_cost == 5
     assert result.health_loss == 0
-    assert "You guide Maple through a focused training session, Mia." in result.message
+    assert "You guide Maple through a focused training session." in result.message
     assert "+6 skill, +4 confidence, -5 energy" in result.message
     assert "/ride" in result.message
 
