@@ -19,6 +19,7 @@ from pferdehof_bot.services import (
     name_horse_flow,
     rest_horse_flow,
     ride_horse_flow,
+    stable_roster_flow,
     start_onboarding_flow,
     train_horse_flow,
     view_candidates_flow,
@@ -217,6 +218,31 @@ class CoreCog(commands.Cog):
             display_name=display_name,
         )
         await self._send_response(interaction=interaction, command_id="ride", message=result.message)
+
+    @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
+    async def stable(self, interaction: discord.Interaction) -> None:
+        """Render the adopted-horse roster for the current guild."""
+        guild = interaction.guild
+        guild_id = guild.id if guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+
+        def owner_display_name_resolver(owner_user_id: int) -> str | None:
+            if guild is None:
+                return None
+
+            member = guild.get_member(owner_user_id)
+            if member is None:
+                return None
+
+            return getattr(member, "display_name", member.name)
+
+        result = stable_roster_flow(
+            repository=self._repository,
+            guild_id=guild_id,
+            display_name=display_name,
+            owner_display_name_resolver=owner_display_name_resolver,
+        )
+        await self._send_response(interaction=interaction, command_id="stable", message=result.message)
 
 
 async def setup(bot: commands.Bot) -> None:

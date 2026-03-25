@@ -145,6 +145,16 @@ class RideHorseResult:
 
 
 @dataclass(frozen=True)
+class StableRosterResult:
+    """Result payload for `/stable` command execution."""
+
+    rows: list[dict[str, object]]
+    message: str
+    has_guild_context: bool
+    is_empty: bool
+
+
+@dataclass(frozen=True)
 class AdminRenameHorseResult:
     """Result payload for admin `horse rename` override command."""
 
@@ -1190,6 +1200,67 @@ def ride_horse_flow(
     )
 
 
+def stable_roster_flow(
+    repository: JsonPlayerRepository,
+    guild_id: int | None,
+    display_name: str,
+    owner_display_name_resolver: Callable[[int], str | None] | None = None,
+) -> StableRosterResult:
+    """Render the adopted-horse roster for the current guild."""
+    if guild_id is None:
+        message = (
+            f"The stable roster needs a server stable to look at, {display_name}. "
+            "Use `/stable` from a guild channel."
+        )
+        return StableRosterResult(
+            rows=[],
+            message=message,
+            has_guild_context=False,
+            is_empty=True,
+        )
+
+    raw_rows = repository.list_adopted_horses_by_guild(guild_id=guild_id)
+    if not raw_rows:
+        message = (
+            f"The stable is still quiet in this server, {display_name}. "
+            "No horses have been adopted here yet. Use `/start` to welcome the first one."
+        )
+        return StableRosterResult(
+            rows=[],
+            message=message,
+            has_guild_context=True,
+            is_empty=True,
+        )
+
+    rows: list[dict[str, object]] = []
+    lines = [f"Here is the current stable roster, {display_name}:"]
+    for raw_row in raw_rows:
+        owner_user_id = int(raw_row["owner_user_id"])
+        owner_display_name = _resolve_owner_display_name(
+            owner_user_id=owner_user_id,
+            owner_display_name_resolver=owner_display_name_resolver,
+        )
+        row = {
+            "horse_id": int(raw_row["horse_id"]),
+            "horse_name": str(raw_row["horse_name"]),
+            "owner_user_id": owner_user_id,
+            "owner_display_name": owner_display_name,
+            "guild_id": guild_id,
+        }
+        rows.append(row)
+        lines.append(
+            f"#{row['horse_id']} | {row['horse_name']} | Owner: {row['owner_display_name']}"
+        )
+
+    lines.append("Use `/horse profile` to check on your own companion.")
+    return StableRosterResult(
+        rows=rows,
+        message="\n".join(lines),
+        has_guild_context=True,
+        is_empty=False,
+    )
+
+
 def _emit_telemetry(
     telemetry_logger: TelemetryLogger | None,
     event_name: str,
@@ -1265,3 +1336,21 @@ def _clamp_stat(value: int, minimum: int = 0, maximum: int = 100) -> int:
 def _timestamp_now() -> str:
     """Return the current UTC timestamp in ISO 8601 format."""
     return datetime.now(tz=UTC).isoformat()
+
+
+def _resolve_owner_display_name(
+    owner_user_id: int,
+    owner_display_name_resolver: Callable[[int], str | None] | None,
+) -> str:
+    if owner_display_name_resolver is None:
+        return f"Unknown rider ({owner_user_id})"
+
+    owner_display_name = owner_display_name_resolver(owner_user_id)
+    if owner_display_name is None:
+        return f"Unknown rider ({owner_user_id})"
+
+    normalized_name = str(owner_display_name).strip()
+    if not normalized_name:
+        return f"Unknown rider ({owner_user_id})"
+
+    return normalized_name

@@ -20,6 +20,8 @@ def test_command_registry_includes_required_slash_surface() -> None:
         "groom",
         "rest",
         "train",
+        "ride",
+        "stable",
     }
 
     assert required_ids.issubset(set(COMMAND_REGISTRY.keys()))
@@ -56,3 +58,13 @@ def test_command_registry_admin_and_visibility_metadata() -> None:
     assert train_metadata.command_name == "train"
     assert train_metadata.subcommand_name is None
     assert train_metadata.requires_admin is False
+
+    ride_metadata = get_command_metadata("ride")
+    assert ride_metadata.command_name == "ride"
+    assert ride_metadata.subcommand_name is None
+    assert ride_metadata.requires_admin is False
+
+    stable_metadata = get_command_metadata("stable")
+    assert stable_metadata.command_name == "stable"
+    assert stable_metadata.subcommand_name is None
+    assert stable_metadata.requires_admin is False
