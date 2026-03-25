@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import logging
+import random
 from typing import Callable
 
 _logger = logging.getLogger(__name__)
@@ -79,6 +81,16 @@ class GreetHorseResult:
     player: PlayerRecord | None
     message: str
     has_adopted_horse: bool
+
+
+@dataclass(frozen=True)
+class FeedHorseResult:
+    """Result payload for `/feed` command execution."""
+
+    player: PlayerRecord | None
+    message: str
+    has_adopted_horse: bool
+    energy_gain: int
 
 
 @dataclass(frozen=True)
@@ -704,6 +716,59 @@ def greet_horse_flow(
     )
 
 
+def feed_horse_flow(
+    repository: JsonPlayerRepository,
+    user_id: int,
+    guild_id: int | None,
+    display_name: str,
+    d10_roll: Callable[[], int] | None = None,
+) -> FeedHorseResult:
+    """Feed an adopted horse to restore energy and persist recent activity."""
+    player = repository.get_player(user_id=user_id, guild_id=guild_id)
+    if player is None or not bool(player.get("adopted", False)):
+        message = (
+            f"There is no horse to feed yet, {display_name}. "
+            "Start your adoption journey with `/start`."
+        )
+        return FeedHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=False,
+            energy_gain=0,
+        )
+
+    horse = player.get("horse") or {}
+    horse_name = str(horse.get("name") or "Your horse")
+    current_energy = int(horse.get("energy") or 0)
+    roll = d10_roll() if d10_roll is not None else _roll_d10()
+    energy_gain = _clamp_stat(roll, minimum=1, maximum=10)
+    updated_energy = _clamp_stat(current_energy + energy_gain)
+    recent_activity = (
+        f"You fed {horse_name}, and {horse_name} perked up right away (+{energy_gain} energy)."
+    )
+
+    updated_player = repository.update_horse_state(
+        user_id=user_id,
+        guild_id=guild_id,
+        updates={
+            "energy": updated_energy,
+            "last_fed_at": _timestamp_now(),
+            "recent_activity": recent_activity,
+        },
+    )
+
+    message = (
+        f"You offer a warm feed to {horse_name}, {display_name}. "
+        f"{horse_name} munches happily and feels brighter (+{energy_gain} energy)."
+    )
+    return FeedHorseResult(
+        player=updated_player,
+        message=message,
+        has_adopted_horse=True,
+        energy_gain=energy_gain,
+    )
+
+
 def _emit_telemetry(
     telemetry_logger: TelemetryLogger | None,
     event_name: str,
@@ -719,3 +784,18 @@ def _emit_telemetry(
         guild_id=guild_id,
         candidate_id=candidate_id,
     )
+
+
+def _roll_d10() -> int:
+    """Return a uniform d10 roll for state deltas."""
+    return random.randint(1, 10)
+
+
+def _clamp_stat(value: int, minimum: int = 0, maximum: int = 100) -> int:
+    """Clamp a horse state value within configured bounds."""
+    return max(minimum, min(maximum, int(value)))
+
+
+def _timestamp_now() -> str:
+    """Return the current UTC timestamp in ISO 8601 format."""
+    return datetime.now(tz=UTC).isoformat()

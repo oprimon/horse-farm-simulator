@@ -14,6 +14,7 @@ def test_core_cog_registers_slash_commands() -> None:
     commands_by_name = {command.name: command for command in bot.tree.get_commands()}
     assert "start" in commands_by_name
     assert "greet" in commands_by_name
+    assert "feed" in commands_by_name
     assert "horse" in commands_by_name
 
     horse_group = commands_by_name["horse"]
@@ -37,4 +38,5 @@ def test_prefix_command_handlers_are_not_registered_after_migration() -> None:
 
     assert bot.get_command("start") is None
     assert bot.get_command("greet") is None
+    assert bot.get_command("feed") is None
     assert bot.get_command("horse") is None

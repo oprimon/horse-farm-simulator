@@ -26,7 +26,7 @@ Status values:
 | T02 | Slash migration and command registry foundation | Done | Copilot | 2026-03-23 | Migrated `/start`, `/horse` subcommands, and `/greet` to slash commands; added centralized command registry metadata and environment-safe command sync strategy (`off`, `guild`, `global`). Admin rename migrated as `/horse rename`. |
 | T03 | Horse state model and persistence extension | Done | Copilot | 2026-03-23 | Added schema v2 horse-state persistence, migration for MVP-001 records, state update repository API, and deterministic guild stable roster query with owner linkage. |
 | T04 | State presentation and profile text service | Done | Copilot | 2026-03-23 | Added `state_presentation` service for readable readiness/bond/energy/confidence/skill bands; reused in `/horse` profile rendering with recent-activity text. |
-| T05 | Feed command (`/feed`) | Not Started | Copilot | 2026-03-23 | Implement first care action with adopted-horse guard and state effect. |
+| T05 | Feed command (`/feed`) | Done | Copilot | 2026-03-25 | Added slash `/feed` flow with adopter guard, `1d10` energy gain clamped to `100`, and persisted `last_fed_at` plus `recent_activity`. |
 | T06 | Groom command (`/groom`) | Not Started | Copilot | 2026-03-23 | Implement bonding-focused care action and response copy. |
 | T07 | Rest command (`/rest`) and recovery rules | Not Started | Copilot | 2026-03-23 | Implement recovery action and minimal pacing behavior. |
 | T08 | Training command (`/train`) and progression rules | Not Started | Copilot | 2026-03-23 | Add skill/confidence progression with energy cost and readable feedback. |
@@ -47,6 +47,7 @@ Status values:
 | 2026-03-23 | 2 | T02 | Added centralized command registry (`src/pferdehof_bot/command_registry.py`), migrated player-facing runtime handlers to slash commands, added startup slash sync configuration, updated README slash usage/mapping, and covered slash wiring + sync/config with tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q` (69 passed) | Done |
 | 2026-03-23 | 3 | T03 | Extended repository to schema v2 with persisted horse progression fields (`horse_id`, bond, energy, health, confidence, skill, action timestamps, and recent activity), added migration-safe normalization for MVP-001 records, introduced `update_horse_state` and deterministic `list_adopted_horses_by_guild` APIs, and added repository migration/roster tests. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (71 passed) | Done |
 | 2026-03-23 | 4 | T04 | Added new state-presentation service with consistent banded copy for readiness, bond, energy, confidence, and skill; integrated it into `/horse` profile output and added unit tests for mapping plus profile payload generation. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (78 passed) | Done |
+| 2026-03-25 | 5 | T05 | Implemented slash `/feed` in `CoreCog`, added `feed_horse_flow` with adopted-horse guard and deterministic `1d10` energy delta handling, persisted `last_fed_at` + `recent_activity`, and extended slash/registry and service tests for feed behavior. | `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/pytest.exe -q` (80 passed) | Done |
 
 ---
 

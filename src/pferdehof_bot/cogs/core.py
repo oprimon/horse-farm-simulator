@@ -12,6 +12,7 @@ from pferdehof_bot.services import (
     FileTelemetryLogger,
     admin_rename_horse_flow,
     choose_candidate_flow,
+    feed_horse_flow,
     greet_horse_flow,
     horse_profile_flow,
     name_horse_flow,
@@ -147,6 +148,19 @@ class CoreCog(commands.Cog):
             telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="greet", message=result.message)
+
+    @app_commands.command(name="feed", description="Feed your adopted horse to restore energy")
+    async def feed(self, interaction: discord.Interaction) -> None:
+        """Feed an adopted horse and persist the latest care activity."""
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        result = feed_horse_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            guild_id=guild_id,
+            display_name=display_name,
+        )
+        await self._send_response(interaction=interaction, command_id="feed", message=result.message)
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -6,6 +6,7 @@ from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services import (
     admin_rename_horse_flow,
     choose_candidate_flow,
+    feed_horse_flow,
     greet_horse_flow,
     horse_profile_flow,
     name_horse_flow,
@@ -470,6 +471,76 @@ def test_greet_horse_flow_returns_personalized_response_for_adopter(tmp_path) ->
     assert "You greet Luna softly, Mia." in result.message
     assert "Luna steps closer" in result.message
     assert "happy to see you" in result.message
+
+
+def test_feed_horse_flow_requires_adopted_horse(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+
+    result = feed_horse_flow(
+        repository=repository,
+        user_id=820,
+        guild_id=821,
+        display_name="Mia",
+    )
+
+    assert result.player is None
+    assert result.has_adopted_horse is False
+    assert result.energy_gain == 0
+    assert "There is no horse to feed yet" in result.message
+    assert "/start" in result.message
+
+
+def test_feed_horse_flow_updates_energy_and_recent_activity(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    candidates = [
+        {
+            "id": "A",
+            "appearance_text": "Chestnut with bright blaze",
+            "hint": "Curious",
+            "template_seed": 1,
+        },
+        {
+            "id": "B",
+            "appearance_text": "Bay with white socks",
+            "hint": "Calm",
+            "template_seed": 2,
+        },
+        {
+            "id": "C",
+            "appearance_text": "Grey with tiny star",
+            "hint": "Brave",
+            "template_seed": 3,
+        },
+    ]
+    repository.start_onboarding(user_id=822, guild_id=823, candidates=candidates)
+    repository.set_chosen_candidate(user_id=822, guild_id=823, candidate_id="A")
+    repository.finalize_horse_name(user_id=822, guild_id=823, name="Luna")
+    repository.update_horse_state(
+        user_id=822,
+        guild_id=823,
+        updates={"energy": 96},
+    )
+
+    result = feed_horse_flow(
+        repository=repository,
+        user_id=822,
+        guild_id=823,
+        display_name="Mia",
+        d10_roll=lambda: 7,
+    )
+
+    assert result.player is not None
+    assert result.has_adopted_horse is True
+    assert result.energy_gain == 7
+    assert "You offer a warm feed to Luna, Mia." in result.message
+    assert "+7 energy" in result.message
+
+    persisted = repository.get_player(user_id=822, guild_id=823)
+    assert persisted is not None
+    assert persisted["horse"]["energy"] == 100
+    assert persisted["horse"]["last_fed_at"] is not None
+    assert persisted["horse"]["recent_activity"] is not None
+    assert "You fed Luna" in persisted["horse"]["recent_activity"]
 
 
 # ---------------------------------------------------------------------------
