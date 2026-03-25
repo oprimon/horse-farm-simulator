@@ -62,7 +62,7 @@ _HINT_BY_PRIMARY_SKILL: dict[str, tuple[str, ...]] = {
     ),
     "confidence": (
         "Keeps calm even in unfamiliar moments.",
-        "Holds posture like little surprises do not bother them.",
+        "Stays composed when little surprises happen.",
     ),
     "skill": (
         "Seems quick to understand new routines.",

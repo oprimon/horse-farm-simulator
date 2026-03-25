@@ -581,10 +581,11 @@ def name_horse_flow(
     )
     horse = updated_player.get("horse") or {}
     appearance = str(horse.get("appearance", "a wonderful horse"))
-    hint = str(horse.get("hint", "steady-hearted"))
+    hint = _normalize_hint_text(horse.get("hint"), fallback="Steady-hearted and kind.")
     message = (
         f"What a beautiful name, {display_name}. {normalized_name} is officially your horse now. "
-        f"{normalized_name} appears as {appearance} and feels {hint}. "
+        f"Appearance: {appearance}. "
+        f"First impression: {hint} "
         "Your adoption is complete."
     )
     return NameHorseResult(
@@ -765,10 +766,12 @@ def greet_horse_flow(
 
     horse = updated_player.get("horse") or {}
     horse_name = str(horse.get("name") or "Your horse")
-    hint = str(horse.get("hint") or "gentle")
+    hint = _normalize_hint_text(horse.get("hint"), fallback="Gentle and attentive.")
+    reaction = _greet_reaction_from_hint(horse_name=horse_name, hint=hint)
     message = (
-        f"You greet {horse_name} softly, {display_name}. "
-        f"{horse_name} steps closer with a {hint.lower()} spark and seems happy to see you."
+        f"You greet {horse_name} softly. "
+        f"{reaction} "
+        f"First impression: {hint}"
     )
     return GreetHorseResult(
         player=updated_player,
@@ -1418,3 +1421,26 @@ def _resolve_owner_display_name(
         return f"Unknown rider ({owner_user_id})"
 
     return normalized_name
+
+
+def _normalize_hint_text(value: object, fallback: str) -> str:
+    hint_text = str(value).strip() if value is not None else ""
+    if not hint_text:
+        hint_text = fallback.strip()
+
+    if hint_text[-1] not in {".", "!", "?"}:
+        hint_text = f"{hint_text}."
+    return hint_text
+
+
+def _greet_reaction_from_hint(horse_name: str, hint: str) -> str:
+    lowered_hint = hint.lower()
+    if "calm" in lowered_hint or "composed" in lowered_hint or "steady" in lowered_hint:
+        return f"{horse_name} stays relaxed, steps closer, and seems happy to see you."
+    if "lively" in lowered_hint or "eager" in lowered_hint or "spark" in lowered_hint:
+        return f"{horse_name} pricks their ears, steps in eagerly, and seems happy to see you."
+    if "connect" in lowered_hint or "leans" in lowered_hint or "trust" in lowered_hint:
+        return f"{horse_name} leans in toward you and seems happy to see you."
+    if "learn" in lowered_hint or "routines" in lowered_hint or "closely" in lowered_hint:
+        return f"{horse_name} watches you closely, steps closer, and seems happy to see you."
+    return f"{horse_name} steps closer and seems happy to see you."

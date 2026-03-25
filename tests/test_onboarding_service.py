@@ -476,7 +476,7 @@ def test_greet_horse_flow_returns_personalized_response_for_adopter(tmp_path) ->
 
     assert result.player is not None
     assert result.has_adopted_horse is True
-    assert "You greet Luna softly, Mia." in result.message
+    assert "You greet Luna softly." in result.message
     assert "Luna steps closer" in result.message
     assert "happy to see you" in result.message
 
