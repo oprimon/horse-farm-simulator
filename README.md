@@ -159,17 +159,56 @@ Migration mapping from prefix to slash:
 ## Planned Features
 
 The following features are planned for upcoming development:
-- Horse care actions such as feed, groom, and rest
-- Training and first ride loop with readable horse state feedback
-- Stable roster command per guild to see adopted horses in the server
-- Expanded progression state for bond, energy, health, confidence, and skill
-- Ride outcome variety based on horse state and recent activity
-- Additional telemetry for balancing and retention analysis
+- Integration tests for the full MVP-002 loop and persistence reload paths
+- MVP-002 exit checklist and MVP-003 recommendation handoff
 
 ## Data and Persistence
 
 - Player data is stored in data/players.json
 - Telemetry events are stored in data/telemetry.jsonl
+
+### Telemetry Event Contract (MVP-002)
+
+The bot emits JSON Lines telemetry events for onboarding and loop instrumentation.
+
+Supported event names:
+
+- start_onboarding
+- viewed_candidates
+- chose_candidate
+- named_horse
+- first_interaction
+- fed_horse
+- groomed_horse
+- rested_horse
+- trained_horse
+- rode_horse
+- ride_outcome
+- viewed_stable
+
+Payload fields:
+
+- event_name (required)
+- user_id (required)
+- guild_id (required when in a guild, otherwise null)
+- timestamp (required, UTC ISO-8601)
+- candidate_id (on candidate selection/naming events)
+- horse_name (on care, training, and ride events)
+- outcome_id (on ride_outcome)
+- outcome_category (on ride_outcome)
+
+Sample event payloads:
+
+```json
+{"event_name":"fed_horse","user_id":123,"guild_id":456,"timestamp":"2026-03-25T08:42:13.000000+00:00","horse_name":"Maple"}
+{"event_name":"ride_outcome","user_id":123,"guild_id":456,"timestamp":"2026-03-25T09:01:22.000000+00:00","horse_name":"Maple","outcome_id":"steady_trot","outcome_category":"good"}
+```
+
+Analysis instructions:
+
+- Funnel conversion summary (onboarding): `python scripts/summarize_telemetry.py data/telemetry.jsonl`
+- Keep telemetry for analysis only (no gameplay decisions depend on telemetry delivery).
+- Check loop usage by counting unique `user_id:guild_id` pairs per event and comparing care -> train -> ride progression.
 
 ## Project Structure
 

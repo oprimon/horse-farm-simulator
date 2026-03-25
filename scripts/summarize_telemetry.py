@@ -1,4 +1,4 @@
-"""Summarize onboarding funnel telemetry from a JSON Lines event log."""
+"""Summarize onboarding and MVP-002 loop telemetry from a JSON Lines event log."""
 
 from __future__ import annotations
 
@@ -14,6 +14,14 @@ FUNNEL_STEPS = [
     "chose_candidate",
     "named_horse",
     "first_interaction",
+]
+
+LOOP_STEPS = [
+    "fed_horse",
+    "groomed_horse",
+    "rested_horse",
+    "trained_horse",
+    "rode_horse",
 ]
 
 
@@ -39,6 +47,7 @@ def main() -> int:
 
     start_count = len(users_by_event.get("start_onboarding", set()))
     print(f"Telemetry file: {telemetry_path}")
+    print("Onboarding funnel:")
     for index, step in enumerate(FUNNEL_STEPS, start=1):
         current_count = len(users_by_event.get(step, set()))
         previous_step = FUNNEL_STEPS[index - 2] if index > 1 else None
@@ -48,6 +57,18 @@ def main() -> int:
         print(
             f"{step}: users={current_count} step_rate={step_rate:.1f}% overall_from_start={overall_rate:.1f}%"
         )
+
+    print("\nMVP-002 loop usage:")
+    named_horse_count = len(users_by_event.get("named_horse", set()))
+    for step in LOOP_STEPS:
+        current_count = len(users_by_event.get(step, set()))
+        adopter_rate = (current_count / named_horse_count * 100.0) if named_horse_count else 0.0
+        print(f"{step}: users={current_count} overall_from_adopters={adopter_rate:.1f}%")
+
+    ride_outcome_count = len(users_by_event.get("ride_outcome", set()))
+    stable_view_count = len(users_by_event.get("viewed_stable", set()))
+    print(f"ride_outcome: users={ride_outcome_count}")
+    print(f"viewed_stable: users={stable_view_count}")
     return 0
 
 

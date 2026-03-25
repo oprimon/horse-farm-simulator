@@ -164,6 +164,7 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
             guild_id=guild_id,
             display_name=display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="feed", message=result.message)
 
@@ -177,6 +178,7 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
             guild_id=guild_id,
             display_name=display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="groom", message=result.message)
 
@@ -190,6 +192,7 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
             guild_id=guild_id,
             display_name=display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="rest", message=result.message)
 
@@ -203,6 +206,7 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
             guild_id=guild_id,
             display_name=display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="train", message=result.message)
 
@@ -216,6 +220,7 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
             guild_id=guild_id,
             display_name=display_name,
+            telemetry_logger=self._telemetry_logger,
         )
         await self._send_response(interaction=interaction, command_id="ride", message=result.message)
 
@@ -241,6 +246,8 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=display_name,
             owner_display_name_resolver=owner_display_name_resolver,
+            telemetry_logger=self._telemetry_logger,
+            user_id=interaction.user.id,
         )
         await self._send_response(interaction=interaction, command_id="stable", message=result.message)
 

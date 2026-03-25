@@ -17,7 +17,7 @@ from .candidate_generator import generate_candidate_horses
 from .moderation import contains_blocked_name_term, validate_horse_name
 from .ride_outcomes import RideOutcomeResult, select_ride_outcome
 from .state_presentation import build_horse_state_presentation
-from .telemetry import TelemetryLogger
+from .telemetry import TelemetryEventName, TelemetryLogger
 
 
 @dataclass(frozen=True)
@@ -783,6 +783,7 @@ def feed_horse_flow(
     guild_id: int | None,
     display_name: str,
     d10_roll: Callable[[], int] | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> FeedHorseResult:
     """Feed an adopted horse to restore energy and persist recent activity."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -817,6 +818,13 @@ def feed_horse_flow(
             "recent_activity": recent_activity,
         },
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="fed_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+    )
 
     message = (
         f"You offer a warm feed to {horse_name}, {display_name}. "
@@ -838,6 +846,7 @@ def groom_horse_flow(
     stat_selector: Callable[[], str] | None = None,
     d100_roll: Callable[[], int] | None = None,
     d10_roll: Callable[[], int] | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> GroomHorseResult:
     """Groom an adopted horse with a chance to increase bond or health."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -890,6 +899,13 @@ def groom_horse_flow(
             "recent_activity": recent_activity,
         },
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="groomed_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+    )
 
     message = f"You groom {horse_name} carefully, {display_name}. {reaction_text}"
     return GroomHorseResult(
@@ -907,6 +923,7 @@ def rest_horse_flow(
     guild_id: int | None,
     display_name: str,
     d10_roll: Callable[[], int] | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> RestHorseResult:
     """Rest an adopted horse to restore health and persist recent activity."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -941,6 +958,13 @@ def rest_horse_flow(
             "recent_activity": recent_activity,
         },
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="rested_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+    )
 
     message = (
         f"You settle {horse_name} in for a comfortable rest, {display_name}. "
@@ -961,6 +985,7 @@ def train_horse_flow(
     display_name: str,
     d100_roll: Callable[[], int] | None = None,
     d10_roll: Callable[[], int] | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> TrainHorseResult:
     """Train an adopted horse with readable progression, risk, and energy tradeoffs."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -1056,6 +1081,13 @@ def train_horse_flow(
             "recent_activity": recent_activity,
         },
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="trained_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+    )
 
     updated_horse = updated_player.get("horse") or {}
     state_presentation = build_horse_state_presentation(updated_horse)
@@ -1095,6 +1127,7 @@ def ride_horse_flow(
     d100_roll: Callable[[], int] | None = None,
     d10_roll: Callable[[], int] | None = None,
     rng: random.Random | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
 ) -> RideHorseResult:
     """Take an adopted horse on a ride and persist the outcome as recent activity."""
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -1175,6 +1208,22 @@ def ride_horse_flow(
         guild_id=guild_id,
         updates=updates,
     )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="rode_horse",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+    )
+    _emit_telemetry(
+        telemetry_logger=telemetry_logger,
+        event_name="ride_outcome",
+        user_id=user_id,
+        guild_id=guild_id,
+        horse_name=horse_name,
+        outcome_id=outcome.outcome_id,
+        outcome_category=outcome.category,
+    )
 
     result_parts: list[str] = []
     if ride_stat_gain > 0:
@@ -1205,6 +1254,8 @@ def stable_roster_flow(
     guild_id: int | None,
     display_name: str,
     owner_display_name_resolver: Callable[[int], str | None] | None = None,
+    telemetry_logger: TelemetryLogger | None = None,
+    user_id: int | None = None,
 ) -> StableRosterResult:
     """Render the adopted-horse roster for the current guild."""
     if guild_id is None:
@@ -1253,6 +1304,13 @@ def stable_roster_flow(
         )
 
     lines.append("Use `/horse profile` to check on your own companion.")
+    if user_id is not None:
+        _emit_telemetry(
+            telemetry_logger=telemetry_logger,
+            event_name="viewed_stable",
+            user_id=user_id,
+            guild_id=guild_id,
+        )
     return StableRosterResult(
         rows=rows,
         message="\n".join(lines),
@@ -1263,10 +1321,13 @@ def stable_roster_flow(
 
 def _emit_telemetry(
     telemetry_logger: TelemetryLogger | None,
-    event_name: str,
+    event_name: TelemetryEventName,
     user_id: int,
     guild_id: int | None,
     candidate_id: str | None = None,
+    horse_name: str | None = None,
+    outcome_id: str | None = None,
+    outcome_category: str | None = None,
 ) -> None:
     if telemetry_logger is None:
         return
@@ -1275,6 +1336,9 @@ def _emit_telemetry(
         user_id=user_id,
         guild_id=guild_id,
         candidate_id=candidate_id,
+        horse_name=horse_name,
+        outcome_id=outcome_id,
+        outcome_category=outcome_category,
     )
 
 
