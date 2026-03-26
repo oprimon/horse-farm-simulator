@@ -1261,7 +1261,7 @@ def test_ride_horse_flow_bond_can_increase(tmp_path) -> None:
 
 
 def test_ride_horse_flow_recent_activity_is_outcome_text(tmp_path) -> None:
-    """recent_activity stored in horse matches the ride outcome's recent_activity_text."""
+    """recent_activity starts with outcome text and appends roll-aware ride notes."""
     repository = _make_adopted_repo_for_riding(tmp_path, user_id=960, guild_id=961)
     repository.update_horse_state(
         user_id=960,
@@ -1280,7 +1280,9 @@ def test_ride_horse_flow_recent_activity_is_outcome_text(tmp_path) -> None:
     assert result.outcome is not None
     persisted = repository.get_player(user_id=960, guild_id=961)
     assert persisted is not None
-    assert persisted["horse"]["recent_activity"] == result.outcome.recent_activity_text
+    recent_activity = str(persisted["horse"]["recent_activity"])
+    assert recent_activity.startswith(result.outcome.recent_activity_text)
+    assert "Ride notes:" in recent_activity
 
 
 def test_ride_horse_flow_horse_profile_shows_ride_recent_activity(tmp_path) -> None:
@@ -1309,7 +1311,71 @@ def test_ride_horse_flow_horse_profile_shows_ride_recent_activity(tmp_path) -> N
 
     assert ride_result.outcome is not None
     # The recent activity from the ride should appear in the horse profile.
-    assert ride_result.outcome.recent_activity_text in profile_result.message
+    assert "Ride notes:" in profile_result.message
+
+
+def test_ride_horse_flow_uses_low_energy_and_health_mishap_narrative(tmp_path) -> None:
+    """Low energy loss and triggered health loss should produce matching story cues."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=964, guild_id=965)
+    repository.update_horse_state(
+        user_id=964,
+        guild_id=965,
+        updates={"confidence": 50, "bond": 40, "skill": 10, "energy": 80, "health": 90},
+    )
+
+    # d100[0]=5 <= confidence -> no gain
+    # d10[0..2]=1,1,1 -> energy_loss=3 (low)
+    # d100[1]=95 > skill(10) -> health loss; d10[3]=2
+    d100_iter = iter([5, 95])
+    d10_iter = iter([1, 1, 1, 2])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=964,
+        guild_id=965,
+        display_name="Mia",
+        stat_selector=lambda: "confidence",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(11),
+    )
+
+    assert result.energy_loss == 3
+    assert result.health_loss == 2
+    assert "lightly winded" in result.message
+    assert "small mishap" in result.message
+
+
+def test_ride_horse_flow_uses_high_energy_and_steady_health_narrative(tmp_path) -> None:
+    """High energy loss without health loss should use exhaustion and sure-footed cues."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=966, guild_id=967)
+    repository.update_horse_state(
+        user_id=966,
+        guild_id=967,
+        updates={"confidence": 30, "bond": 60, "skill": 95, "energy": 90, "health": 90},
+    )
+
+    # d100[0]=20 <= bond -> no gain
+    # d10[0..2]=10,10,10 -> energy_loss=30 (high)
+    # d100[1]=20 <= skill(95) -> no health loss
+    d100_iter = iter([20, 20])
+    d10_iter = iter([10, 10, 10])
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=966,
+        guild_id=967,
+        display_name="Mia",
+        stat_selector=lambda: "bond",
+        d100_roll=lambda: next(d100_iter),
+        d10_roll=lambda: next(d10_iter),
+        rng=random.Random(17),
+    )
+
+    assert result.energy_loss == 30
+    assert result.health_loss == 0
+    assert "deeply spent" in result.message
+    assert "stays sure-footed" in result.message
 
 
 def test_stable_roster_flow_handles_empty_guild(tmp_path) -> None:

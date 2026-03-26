@@ -282,7 +282,8 @@ def test_mvp002_persistence_survives_repository_reload(tmp_path) -> None:
     assert persisted["horse"] is not None
     assert persisted["horse"]["name"] == "Willow"
     assert persisted["horse"]["last_rode_at"] is not None
-    assert persisted["horse"]["recent_activity"] == ride_result.outcome.recent_activity_text
+    assert ride_result.outcome.recent_activity_text in persisted["horse"]["recent_activity"]
+    assert "Ride notes:" in persisted["horse"]["recent_activity"]
 
     stable_result = stable_roster_flow(
         repository=reloaded_repository,

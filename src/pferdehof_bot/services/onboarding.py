@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
 import random
-from typing import Callable
+from typing import Callable, Sequence
 
 _logger = logging.getLogger(__name__)
 
@@ -18,6 +18,74 @@ from .moderation import contains_blocked_name_term, validate_horse_name
 from .ride_outcomes import RideOutcomeResult, select_ride_outcome
 from .state_presentation import build_horse_state_presentation
 from .telemetry import TelemetryEventName, TelemetryLogger
+
+
+_RIDE_GENERIC_OPENING_POOL: tuple[str, ...] = (
+    "The path opens up gently, and the two of you settle into an easy rhythm.",
+    "The ride begins with quiet focus, with hoofbeats and breath finding the same cadence.",
+    "A calm stretch of trail gives you both space to settle and listen to each other.",
+)
+
+_RIDE_GENERIC_CLOSING_POOL: tuple[str, ...] = (
+    "Back at the stable, the ride lingers as one of those moments that quietly matter.",
+    "By the time you head home, both of you feel a little more in tune than before.",
+    "When you turn for home, it feels like another small chapter in your shared story.",
+)
+
+_RIDE_ENERGY_NARRATIVE_BY_TIER: dict[str, tuple[str, ...]] = {
+    "low": (
+        "Even after the outing, {horse_name} is only lightly winded and still moving with ease.",
+        "The effort leaves {horse_name} lightly winded, with plenty of spark still in the stride.",
+    ),
+    "medium": (
+        "The work leaves {horse_name} noticeably tired, and the slower walk home feels well earned.",
+        "By the end, {horse_name} is noticeably tired and grateful for the gentler pace back.",
+    ),
+    "high": (
+        "That stretch pushes hard, and {horse_name} comes back deeply spent after giving so much.",
+        "It is a demanding effort, and {horse_name} returns deeply spent but still willing.",
+    ),
+}
+
+_RIDE_HEALTH_LOSS_NARRATIVE_BY_TIER: dict[str, tuple[str, ...]] = {
+    "low": (
+        "A small mishap on uneven ground causes a minor scrape before you steady things quickly.",
+        "There is a small mishap over rough footing, leaving a minor scrape before you ease off.",
+    ),
+    "medium": (
+        "A small mishap on the trail knocks the rhythm off for a moment and leaves clear soreness.",
+        "One small mishap near a bend leads to a clumsy step and a bit more soreness than expected.",
+    ),
+    "high": (
+        "A small mishap late in the ride turns into a heavier jolt, so you finish carefully and head home.",
+        "Near the end, a small mishap causes a hard stumble, and you call the tougher work there.",
+    ),
+}
+
+_RIDE_HEALTH_STEADY_POOL: tuple[str, ...] = (
+    "Across the whole route, {horse_name} stays sure-footed and comfortable.",
+    "No rough moment takes hold today; {horse_name} stays sure-footed from start to finish.",
+)
+
+_RIDE_STAT_GAIN_NARRATIVE_BY_TIER: dict[str, tuple[str, ...]] = {
+    "low": (
+        "You notice a little breakthrough in {stat_name} by the time you finish.",
+        "By the end, there is a little breakthrough in {stat_name} worth building on.",
+    ),
+    "medium": (
+        "The session lands as a solid breakthrough in {stat_name}.",
+        "You can feel a solid breakthrough in {stat_name} settling in.",
+    ),
+    "high": (
+        "Somewhere mid-ride, a major breakthrough in {stat_name} clicks into place.",
+        "It turns into a major breakthrough in {stat_name} that you both seem to feel.",
+    ),
+}
+
+_RIDE_STAT_NO_GAIN_POOL: tuple[str, ...] = (
+    "There is no obvious jump in {stat_name} today, but the steady practice still counts.",
+    "{stat_name_cap} stays about the same this time, yet the consistency will matter later.",
+)
 
 
 @dataclass(frozen=True)
@@ -1198,7 +1266,17 @@ def ride_horse_flow(
     updated_energy = _clamp_stat(current_energy - energy_loss)
     updated_health = _clamp_stat(current_health - health_loss)
 
-    recent_activity = outcome.recent_activity_text
+    _rng = rng if rng is not None else random.Random()
+    contextual_story, contextual_recent = _compose_ride_roll_narrative(
+        horse_name=horse_name,
+        ride_stat=selected_stat,
+        ride_stat_gain=ride_stat_gain,
+        energy_loss=energy_loss,
+        health_loss=health_loss,
+        rng=_rng,
+    )
+
+    recent_activity = f"{outcome.recent_activity_text} {contextual_recent}"
     updates: dict[str, object] = {
         selected_stat: updated_selected,
         "energy": updated_energy,
@@ -1238,6 +1316,7 @@ def ride_horse_flow(
 
     message = (
         f"{outcome.story_text}\n\n"
+        f"{contextual_story}\n\n"
         f"({result_summary})\n\nUse `/horse profile` to see {horse_name}'s updated profile."
     )
     return RideHorseResult(
@@ -1393,6 +1472,98 @@ def _slight_chance_to_decrease(
 
     rolled_loss = d10_roll() if d10_roll is not None else _roll_d10()
     return _clamp_stat(rolled_loss, minimum=1, maximum=10)
+
+
+def _compose_ride_roll_narrative(
+    horse_name: str,
+    ride_stat: str,
+    ride_stat_gain: int,
+    energy_loss: int,
+    health_loss: int,
+    rng: random.Random,
+) -> tuple[str, str]:
+    """Build descriptive ride text from roll outcomes with future-stat compatibility."""
+    stat_name = ride_stat.replace("_", " ").strip() or "readiness"
+    stat_name_cap = stat_name.capitalize()
+
+    energy_tier = _delta_tier(amount=energy_loss, max_amount=30)
+    health_tier = _delta_tier(amount=health_loss, max_amount=10)
+    gain_tier = _delta_tier(amount=ride_stat_gain, max_amount=10)
+
+    parts: list[str] = [_pick(pool=_RIDE_GENERIC_OPENING_POOL, rng=rng)]
+    parts.append(
+        _pick(pool=_RIDE_ENERGY_NARRATIVE_BY_TIER[energy_tier], rng=rng).format(horse_name=horse_name)
+    )
+
+    if health_loss > 0:
+        parts.append(
+            _pick(pool=_RIDE_HEALTH_LOSS_NARRATIVE_BY_TIER[health_tier], rng=rng).format(
+                horse_name=horse_name
+            )
+        )
+    else:
+        parts.append(_pick(pool=_RIDE_HEALTH_STEADY_POOL, rng=rng).format(horse_name=horse_name))
+
+    if ride_stat_gain > 0:
+        parts.append(
+            _pick(pool=_RIDE_STAT_GAIN_NARRATIVE_BY_TIER[gain_tier], rng=rng).format(
+                stat_name=stat_name,
+                stat_name_cap=stat_name_cap,
+            )
+        )
+    else:
+        parts.append(
+            _pick(pool=_RIDE_STAT_NO_GAIN_POOL, rng=rng).format(
+                stat_name=stat_name,
+                stat_name_cap=stat_name_cap,
+            )
+        )
+
+    parts.append(_pick(pool=_RIDE_GENERIC_CLOSING_POOL, rng=rng))
+
+    story_text = " ".join(parts)
+    recent_text = (
+        f"Ride notes: {_build_recent_energy_fragment(horse_name=horse_name, energy_tier=energy_tier)} "
+        f"{_build_recent_health_fragment(health_loss=health_loss)} "
+        f"{_build_recent_stat_fragment(stat_name=stat_name, ride_stat_gain=ride_stat_gain)}"
+    )
+    return story_text, recent_text
+
+
+def _build_recent_energy_fragment(horse_name: str, energy_tier: str) -> str:
+    if energy_tier == "low":
+        return f"{horse_name} is lightly winded."
+    if energy_tier == "medium":
+        return f"{horse_name} is noticeably tired."
+    return f"{horse_name} is deeply spent."
+
+
+def _build_recent_health_fragment(health_loss: int) -> str:
+    if health_loss > 0:
+        return "A small mishap left some soreness."
+    return "No rough moment caused health trouble."
+
+
+def _build_recent_stat_fragment(stat_name: str, ride_stat_gain: int) -> str:
+    if ride_stat_gain > 0:
+        return f"{stat_name.capitalize()} saw a breakthrough (+{ride_stat_gain})."
+    return f"{stat_name.capitalize()} held steady this ride."
+
+
+def _delta_tier(amount: int, max_amount: int) -> str:
+    """Map a positive delta amount to low/medium/high narrative tiers."""
+    normalized = max(0, min(max_amount, int(amount)))
+    if normalized <= 0:
+        return "low"
+    if normalized <= max_amount // 3:
+        return "low"
+    if normalized <= (2 * max_amount) // 3:
+        return "medium"
+    return "high"
+
+
+def _pick(pool: Sequence[str], rng: random.Random) -> str:
+    return rng.choice(tuple(pool))
 
 
 def _clamp_stat(value: int, minimum: int = 0, maximum: int = 100) -> int:
