@@ -326,3 +326,25 @@ def test_mvp002_failure_paths_do_not_emit_new_events(tmp_path) -> None:
     )
 
     assert telemetry_logger.events == []
+
+
+def test_ride_blocked_by_readiness_does_not_emit_ride_events(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    telemetry_logger = InMemoryTelemetryLogger()
+
+    _adopt_horse(repository=repository, user_id=940, guild_id=941, horse_name="Maple")
+    repository.update_horse_state(
+        user_id=940,
+        guild_id=941,
+        updates={"energy": 29, "health": 9},
+    )
+
+    ride_horse_flow(
+        repository=repository,
+        user_id=940,
+        guild_id=941,
+        display_name="Mia",
+        telemetry_logger=telemetry_logger,
+    )
+
+    assert telemetry_logger.events == []

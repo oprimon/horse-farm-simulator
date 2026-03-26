@@ -204,6 +204,7 @@ class RideHorseResult:
     player: PlayerRecord | None
     message: str
     has_adopted_horse: bool
+    blocked_by_readiness: bool
     outcome: RideOutcomeResult | None
     ride_stat: str | None
     """The stat subject to the chance-to-increase check: 'confidence' or 'bond'."""
@@ -1211,6 +1212,7 @@ def ride_horse_flow(
             player=player,
             message=message,
             has_adopted_horse=False,
+            blocked_by_readiness=False,
             outcome=None,
             ride_stat=None,
             ride_stat_gain=0,
@@ -1225,6 +1227,28 @@ def ride_horse_flow(
     current_skill = _clamp_stat(int(horse.get("skill") or 0))
     current_confidence = _clamp_stat(int(horse.get("confidence") or 0))
     current_bond = _clamp_stat(int(horse.get("bond") or 0))
+
+    # Option A safety rule: require enough stats to cover maximum possible ride losses.
+    # - Energy can decrease by up to 30 (3d10), so require at least 30.
+    # - Health can decrease by up to 10 (1d10), so require at least 10.
+    if current_energy < 30 or current_health < 10:
+        state_presentation = build_horse_state_presentation(horse)
+        message = (
+            f"You decide not to ride {horse_name} right now. "
+            f"{horse_name} feels {state_presentation.readiness_feel}, and a safe ride needs at least 30 energy and 10 health. "
+            "Try `/feed` or `/rest` first, then come back to `/ride`."
+        )
+        return RideHorseResult(
+            player=player,
+            message=message,
+            has_adopted_horse=True,
+            blocked_by_readiness=True,
+            outcome=None,
+            ride_stat=None,
+            ride_stat_gain=0,
+            energy_loss=0,
+            health_loss=0,
+        )
 
     # Select the stat to try and increase (confidence or bond).
     selected_stat = stat_selector() if stat_selector is not None else random.choice(("confidence", "bond"))
@@ -1323,6 +1347,7 @@ def ride_horse_flow(
         player=updated_player,
         message=message,
         has_adopted_horse=True,
+        blocked_by_readiness=False,
         outcome=outcome,
         ride_stat=selected_stat,
         ride_stat_gain=ride_stat_gain,

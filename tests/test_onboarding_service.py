@@ -1092,6 +1092,7 @@ def test_ride_horse_flow_requires_adopted_horse(tmp_path) -> None:
 
     assert result.player is None
     assert result.has_adopted_horse is False
+    assert result.blocked_by_readiness is False
     assert result.outcome is None
     assert result.ride_stat is None
     assert result.ride_stat_gain == 0
@@ -1128,6 +1129,7 @@ def test_ride_horse_flow_stat_gain_and_energy_loss_no_health_loss(tmp_path) -> N
     )
 
     assert result.has_adopted_horse is True
+    assert result.blocked_by_readiness is False
     assert result.ride_stat == "confidence"
     assert result.ride_stat_gain == 5
     assert result.energy_loss == 9
@@ -1175,6 +1177,7 @@ def test_ride_horse_flow_no_stat_gain_with_health_loss(tmp_path) -> None:
     )
 
     assert result.has_adopted_horse is True
+    assert result.blocked_by_readiness is False
     assert result.ride_stat == "bond"
     assert result.ride_stat_gain == 0
     assert result.energy_loss == 9
@@ -1198,7 +1201,7 @@ def test_ride_horse_flow_energy_clamped_to_zero(tmp_path) -> None:
     repository.update_horse_state(
         user_id=956,
         guild_id=957,
-        updates={"confidence": 20, "bond": 30, "skill": 80, "energy": 5, "health": 60},
+        updates={"confidence": 20, "bond": 30, "skill": 80, "energy": 30, "health": 60},
     )
 
     # d100[0]=5 <= confidence(20) → no gain
@@ -1218,6 +1221,7 @@ def test_ride_horse_flow_energy_clamped_to_zero(tmp_path) -> None:
         rng=random.Random(1),
     )
 
+    assert result.blocked_by_readiness is False
     assert result.energy_loss == 30
     persisted = repository.get_player(user_id=956, guild_id=957)
     assert persisted is not None
@@ -1251,6 +1255,7 @@ def test_ride_horse_flow_bond_can_increase(tmp_path) -> None:
     )
 
     assert result.ride_stat == "bond"
+    assert result.blocked_by_readiness is False
     assert result.ride_stat_gain == 8
     assert result.energy_loss == 6
 
@@ -1278,6 +1283,7 @@ def test_ride_horse_flow_recent_activity_is_outcome_text(tmp_path) -> None:
     )
 
     assert result.outcome is not None
+    assert result.blocked_by_readiness is False
     persisted = repository.get_player(user_id=960, guild_id=961)
     assert persisted is not None
     recent_activity = str(persisted["horse"]["recent_activity"])
@@ -1310,8 +1316,42 @@ def test_ride_horse_flow_horse_profile_shows_ride_recent_activity(tmp_path) -> N
     )
 
     assert ride_result.outcome is not None
+    assert ride_result.blocked_by_readiness is False
     # The recent activity from the ride should appear in the horse profile.
     assert "Ride notes:" in profile_result.message
+
+
+def test_ride_horse_flow_blocks_when_max_possible_losses_not_coverable(tmp_path) -> None:
+    """Ride is refused unless energy>=30 and health>=10 (Option A safety gate)."""
+    repository = _make_adopted_repo_for_riding(tmp_path, user_id=968, guild_id=969)
+    repository.update_horse_state(
+        user_id=968,
+        guild_id=969,
+        updates={"confidence": 40, "bond": 40, "skill": 40, "energy": 29, "health": 9},
+    )
+
+    result = ride_horse_flow(
+        repository=repository,
+        user_id=968,
+        guild_id=969,
+        display_name="Mia",
+        rng=random.Random(123),
+    )
+
+    assert result.has_adopted_horse is True
+    assert result.blocked_by_readiness is True
+    assert result.outcome is None
+    assert result.ride_stat is None
+    assert result.ride_stat_gain == 0
+    assert result.energy_loss == 0
+    assert result.health_loss == 0
+    assert "at least 30 energy and 10 health" in result.message
+    assert "/feed" in result.message
+    assert "/rest" in result.message
+
+    persisted = repository.get_player(user_id=968, guild_id=969)
+    assert persisted is not None
+    assert persisted["horse"]["last_rode_at"] is None
 
 
 def test_ride_horse_flow_uses_low_energy_and_health_mishap_narrative(tmp_path) -> None:

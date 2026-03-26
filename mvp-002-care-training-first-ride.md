@@ -99,6 +99,7 @@ Failure signals:
 ### 4. First ride loop
 - Add `/ride` with short text outcomes.
 - Outcomes should depend on current horse state and recent actions.
+- Readiness gate (strict safety baseline): only allow `/ride` when the horse has at least `30` energy and `10` health, so maximum possible losses are always coverable.
 - Baseline state effects:
   - Chance to increase confidence or bond by `1d10` (max `100`) using a `1d100` check against the selected target stat.
   - Energy always decreases by `3d10` (min `0`).

@@ -161,7 +161,7 @@ Migration mapping from prefix to slash:
 Status date: 2026-03-25
 
 1. PASS: Adopted players can use care commands, train, and ride reliably.
-Evidence: Slash commands `/feed`, `/groom`, `/rest`, `/train`, and `/ride` are implemented with adopter/readiness guardrails and covered by integration tests in `tests/test_mvp002_integration.py`.
+Evidence: Slash commands `/feed`, `/groom`, `/rest`, `/train`, and `/ride` are implemented with adopter/readiness guardrails (including `/ride` requiring at least 30 energy and 10 health) and covered by integration tests in `tests/test_mvp002_integration.py`.
 2. PASS: Horse state changes persist across restarts.
 Evidence: Horse state persistence and migration behavior are implemented in the repository layer and verified by repository and integration tests, including reload coverage in `tests/test_mvp002_integration.py`.
 3. PASS: Ride outcomes visibly reflect horse state.
