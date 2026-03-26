@@ -87,7 +87,7 @@ Example:
 
 ### /horse view
 
-Shows your current candidate horses during onboarding.
+Shows your current candidate horses during onboarding. Each candidate is displayed in a rich embed with a button panel so you can adopt directly without typing an id.
 
 Example:
 
@@ -95,9 +95,13 @@ Example:
 /horse view
 ```
 
+After the embed appears, click **Adopt A**, **Adopt B**, or **Adopt C** to lock in your choice. The buttons disable automatically once you choose or after the panel expires (5 minutes).
+
+If the panel has expired or you prefer the command approach, use the slash fallback:
+
 ### /horse choose <id>
 
-Locks in a candidate horse by id.
+Locks in a candidate horse by id. Use this as a fallback whenever the button panel from `/horse view` is no longer available.
 
 Rules:
 - id must be A, B, or C

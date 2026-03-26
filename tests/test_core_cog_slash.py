@@ -236,3 +236,79 @@ def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) ->
     view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
 
     assert view is None
+
+
+def test_candidate_view_rejects_interaction_from_wrong_user(tmp_path) -> None:
+    """A user who did not open /horse view cannot choose via the button panel."""
+    core_cog = _build_core_cog(tmp_path)
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut"},
+        {"id": "B", "appearance_text": "Bay"},
+        {"id": "C", "appearance_text": "Grey"},
+    ]
+    view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
+    assert view is not None
+
+    intruder_response = _FakeInteractionResponse()
+    intruder_interaction = _FakeInteraction()
+    intruder_interaction.response = intruder_response
+    intruder_interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
+    intruder_interaction.guild = None
+
+    asyncio.run(view._handle_choice(interaction=intruder_interaction, candidate_id="A"))  # type: ignore[arg-type]
+
+    assert len(intruder_response.calls) == 1
+    call = intruder_response.calls[0]
+    assert call["ephemeral"] is True
+    assert "Only the player" in call["content"]
+    # Buttons must still be enabled after an unauthorized attempt.
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert all(not btn.disabled for btn in buttons)
+
+
+def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> None:
+    """Buttons become disabled and the view stops after a valid selection."""
+    from pferdehof_bot.repositories import JsonPlayerRepository
+
+    storage_path = tmp_path / "players.json"
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    repository.start_onboarding(
+        user_id=200,
+        guild_id=300,
+        candidates=[
+            {"id": "A", "appearance_text": "Chestnut", "hint": "Brave", "template_seed": 1},
+            {"id": "B", "appearance_text": "Bay", "hint": "Calm", "template_seed": 2},
+            {"id": "C", "appearance_text": "Grey", "hint": "Curious", "template_seed": 3},
+        ],
+    )
+    bot = create_bot()
+    cog = CoreCog(bot=bot, repository=repository)
+    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    view = cog._build_candidate_view(candidates=candidates, owner_user_id=200)
+    assert view is not None
+
+    owner_response = _FakeInteractionResponse()
+    owner_interaction = _FakeInteraction()
+    owner_interaction.response = owner_response
+    owner_interaction.user = SimpleNamespace(id=200, name="Rider", display_name="Rider")
+    owner_interaction.guild = SimpleNamespace(id=300)
+
+    asyncio.run(view._handle_choice(interaction=owner_interaction, candidate_id="B"))  # type: ignore[arg-type]
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert all(btn.disabled for btn in buttons)
+    assert len(owner_response.calls) == 1
+    assert "B" in owner_response.calls[0]["content"]
+
+
+def test_candidate_view_on_timeout_disables_all_buttons(tmp_path) -> None:
+    """on_timeout disables every button so an expired panel is visually clear."""
+    core_cog = _build_core_cog(tmp_path)
+    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
+    assert view is not None
+
+    asyncio.run(view.on_timeout())
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert all(btn.disabled for btn in buttons)

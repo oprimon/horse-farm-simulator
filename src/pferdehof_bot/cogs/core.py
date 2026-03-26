@@ -88,6 +88,14 @@ class CoreCog(commands.Cog):
             def __init__(self) -> None:
                 super().__init__(timeout=300)
 
+            def _disable_all(self) -> None:
+                for item in self.children:
+                    if isinstance(item, discord.ui.Button):
+                        item.disabled = True
+
+            async def on_timeout(self) -> None:
+                self._disable_all()
+
             async def _handle_choice(self, interaction: discord.Interaction, candidate_id: str) -> None:
                 if interaction.user.id != owner_user_id:
                     await interaction.response.send_message(
@@ -106,6 +114,8 @@ class CoreCog(commands.Cog):
                     candidate_id=candidate_id,
                     telemetry_logger=cog._telemetry_logger,
                 )
+                self._disable_all()
+                self.stop()
                 await cog._send_response(
                     interaction=interaction,
                     command_id="horse.choose",
