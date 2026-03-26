@@ -160,6 +160,9 @@ def test_view_candidates_flow_renders_candidate_payload(tmp_path) -> None:
     assert "B: Bay with white socks | Hint: Calm" in result.message
     assert "C: Grey with tiny star | Hint: Curious" in result.message
     assert "/horse choose <id>" in result.message
+    assert result.presentation is not None
+    assert result.presentation.title == "Your Horse Candidates"
+    assert len(result.presentation.fields) == 3
 
 
 def test_choose_candidate_flow_locks_valid_selection_and_persists(tmp_path) -> None:
@@ -328,6 +331,8 @@ def test_name_horse_flow_finalizes_adoption_and_blocks_repeated_naming(tmp_path)
     assert "Luna is officially your horse now" in result.message
     assert "Grey with tiny star" in result.message
     assert "Curious" in result.message
+    assert result.presentation is not None
+    assert "Has Joined Your Stable" in result.presentation.title
 
     persisted = repository.get_player(user_id=152, guild_id=252)
     assert persisted is not None
@@ -1135,6 +1140,8 @@ def test_ride_horse_flow_stat_gain_and_energy_loss_no_health_loss(tmp_path) -> N
     assert result.energy_loss == 9
     assert result.health_loss == 0
     assert result.outcome is not None
+    assert result.presentation is not None
+    assert result.presentation.title == "Ride Complete"
 
     # Message contains outcome narrative and stat summary.
     assert "-9 energy" in result.message

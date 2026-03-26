@@ -267,6 +267,24 @@ class AdminRenameHorseResult:
     presentation: ResponsePresentation | None = None
 
 
+def _build_presentation(
+    title: str,
+    description: str,
+    *,
+    accent: str = "info",
+    footer: str | None = None,
+    fields: tuple[PresentationField, ...] = (),
+) -> ResponsePresentation:
+    """Create a standardized response presentation payload."""
+    return ResponsePresentation(
+        title=title,
+        description=description,
+        fields=fields,
+        accent=accent,
+        footer=footer,
+    )
+
+
 def start_onboarding_flow(
     repository: JsonPlayerRepository,
     user_id: int,
@@ -390,6 +408,14 @@ def view_candidates_flow(
             message=message,
             has_active_session=False,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="No Active Adoption",
+                description=message,
+                accent="warning",
+                fields=(
+                    PresentationField(name="Next Step", value="Use `/start` to begin your horse journey."),
+                ),
+            ),
         )
 
     if bool(player.get("adopted", False)):
@@ -402,6 +428,11 @@ def view_candidates_flow(
             message=message,
             has_active_session=False,
             already_adopted=True,
+            presentation=_build_presentation(
+                title="Adoption Complete",
+                description=message,
+                accent="info",
+            ),
         )
 
     session = player.get("onboarding_session") or {}
@@ -415,6 +446,14 @@ def view_candidates_flow(
             message=message,
             has_active_session=False,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="No Active Adoption",
+                description=message,
+                accent="warning",
+                fields=(
+                    PresentationField(name="Next Step", value="Use `/start` to begin your horse journey."),
+                ),
+            ),
         )
 
     candidates = session.get("candidates", [])
@@ -428,6 +467,11 @@ def view_candidates_flow(
             message=message,
             has_active_session=False,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Candidates Unavailable",
+                description=message,
+                accent="warning",
+            ),
         )
 
     lines = [
@@ -458,6 +502,22 @@ def view_candidates_flow(
         message="\n".join(lines),
         has_active_session=True,
         already_adopted=False,
+        presentation=_build_presentation(
+            title="Your Horse Candidates",
+            description="Review your three candidates and pick the one that feels right.",
+            accent="info",
+            footer="Choose with `/horse choose <id>`",
+            fields=tuple(
+                PresentationField(
+                    name=f"{str(candidate.get('id', '?')).upper()} Candidate",
+                    value=(
+                        f"{str(candidate.get('appearance_text', 'Unknown appearance'))}\n"
+                        f"Hint: {str(candidate.get('hint', 'Unknown hint'))}"
+                    ),
+                )
+                for candidate in candidates
+            ),
+        ),
     )
 
 
@@ -485,6 +545,11 @@ def choose_candidate_flow(
             invalid_candidate_id=True,
             has_active_session=False,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Invalid Candidate",
+                description=message,
+                accent="warning",
+            ),
         )
 
     player = repository.get_player(user_id=user_id, guild_id=guild_id)
@@ -548,6 +613,11 @@ def choose_candidate_flow(
             invalid_candidate_id=False,
             has_active_session=True,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Choice Already Locked",
+                description=message,
+                accent="info",
+            ),
         )
 
     candidates = session.get("candidates", [])
@@ -565,6 +635,11 @@ def choose_candidate_flow(
             invalid_candidate_id=True,
             has_active_session=True,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Candidate Not Found",
+                description=message,
+                accent="warning",
+            ),
         )
 
     updated_player = repository.set_chosen_candidate(
@@ -591,6 +666,14 @@ def choose_candidate_flow(
         invalid_candidate_id=False,
         has_active_session=True,
         already_adopted=False,
+        presentation=_build_presentation(
+            title="Candidate Locked In",
+            description=message,
+            accent="success",
+            fields=(
+                PresentationField(name="Next Step", value="Finalize adoption with `/horse name <name>`."),
+            ),
+        ),
     )
 
 
@@ -680,6 +763,11 @@ def name_horse_flow(
             has_active_session=True,
             has_chosen_candidate=True,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Name Needs Adjustment",
+                description=message,
+                accent="warning",
+            ),
         )
 
     if name_error == "profanity":
@@ -701,6 +789,11 @@ def name_horse_flow(
             has_active_session=True,
             has_chosen_candidate=True,
             already_adopted=False,
+            presentation=_build_presentation(
+                title="Name Not Allowed",
+                description=message,
+                accent="error",
+            ),
         )
 
     updated_player = repository.finalize_horse_name(
@@ -732,6 +825,16 @@ def name_horse_flow(
         has_active_session=False,
         has_chosen_candidate=True,
         already_adopted=False,
+        presentation=_build_presentation(
+            title=f"{normalized_name} Has Joined Your Stable",
+            description="Your adoption is complete, and your horse is ready for their first day with you.",
+            accent="success",
+            fields=(
+                PresentationField(name="Appearance", value=appearance),
+                PresentationField(name="First Impression", value=hint),
+                PresentationField(name="Try Next", value="Use `/horse profile` or say hello with `/greet`."),
+            ),
+        ),
     )
 
 
@@ -829,6 +932,11 @@ def horse_profile_flow(
             player=player,
             message=message,
             has_adopted_horse=False,
+            presentation=_build_presentation(
+                title="No Adopted Horse Yet",
+                description=message,
+                accent="warning",
+            ),
         )
 
     horse = player.get("horse") or {}
@@ -865,6 +973,26 @@ def horse_profile_flow(
         player=player,
         message="\n".join(lines),
         has_adopted_horse=True,
+        presentation=_build_presentation(
+            title=f"{horse_name} - Horse Profile",
+            description=f"{appearance}\nVisible traits: {traits_text}",
+            accent="info",
+            fields=(
+                PresentationField(name="Mood", value=state_presentation.readiness_feel),
+                PresentationField(name="Bond", value=state_presentation.bond_feel, inline=True),
+                PresentationField(name="Energy", value=state_presentation.energy_feel, inline=True),
+                PresentationField(name="Confidence", value=state_presentation.confidence_feel, inline=True),
+                PresentationField(name="Skill", value=state_presentation.skill_feel, inline=True),
+                PresentationField(
+                    name="Recent Activity",
+                    value=(
+                        state_presentation.recent_activity_text
+                        if state_presentation.recent_activity_text is not None
+                        else "Nothing recent yet - try a cozy interaction like `/greet`."
+                    ),
+                ),
+            ),
+        ),
     )
 
 
@@ -913,6 +1041,14 @@ def greet_horse_flow(
         player=updated_player,
         message=message,
         has_adopted_horse=True,
+        presentation=_build_presentation(
+            title=f"You Greet {horse_name}",
+            description=reaction,
+            accent="success",
+            fields=(
+                PresentationField(name="First Impression", value=hint),
+            ),
+        ),
     )
 
 
@@ -974,6 +1110,14 @@ def feed_horse_flow(
         message=message,
         has_adopted_horse=True,
         energy_gain=energy_gain,
+        presentation=_build_presentation(
+            title=f"{horse_name} Enjoyed The Feed",
+            description=message,
+            accent="success",
+            fields=(
+                PresentationField(name="Energy Gained", value=f"+{energy_gain}"),
+            ),
+        ),
     )
 
 
@@ -1053,6 +1197,15 @@ def groom_horse_flow(
         has_adopted_horse=True,
         groomed_stat=selected_stat,
         stat_gain=stat_gain,
+        presentation=_build_presentation(
+            title=f"{horse_name} Is Groomed",
+            description=message,
+            accent="success",
+            fields=(
+                PresentationField(name="Stat Focus", value=stat_label.capitalize(), inline=True),
+                PresentationField(name="Gain", value=f"+{stat_gain}" if stat_gain > 0 else "No increase", inline=True),
+            ),
+        ),
     )
 
 
@@ -1114,6 +1267,14 @@ def rest_horse_flow(
         message=message,
         has_adopted_horse=True,
         health_gain=health_gain,
+        presentation=_build_presentation(
+            title=f"{horse_name} Had A Rest",
+            description=message,
+            accent="success",
+            fields=(
+                PresentationField(name="Health Gained", value=f"+{health_gain}"),
+            ),
+        ),
     )
 
 
@@ -1167,6 +1328,14 @@ def train_horse_flow(
             confidence_gain=0,
             energy_cost=0,
             health_loss=0,
+            presentation=_build_presentation(
+                title="Training Deferred",
+                description=message,
+                accent="warning",
+                fields=(
+                    PresentationField(name="Recovery Tip", value=recovery_guidance),
+                ),
+            ),
         )
 
     skill_gain = _chance_to_increase(
@@ -1254,6 +1423,25 @@ def train_horse_flow(
         confidence_gain=confidence_gain,
         energy_cost=energy_cost,
         health_loss=health_loss,
+        presentation=_build_presentation(
+            title=f"Training Session With {horse_name}",
+            description=(
+                f"{horse_name} now feels {state_presentation.skill_feel} and "
+                f"{state_presentation.confidence_feel}."
+            ),
+            accent="success",
+            fields=(
+                PresentationField(name="Skill", value=f"+{skill_gain}" if skill_gain > 0 else "No increase", inline=True),
+                PresentationField(
+                    name="Confidence",
+                    value=f"+{confidence_gain}" if confidence_gain > 0 else "No increase",
+                    inline=True,
+                ),
+                PresentationField(name="Energy", value=f"-{energy_cost}", inline=True),
+                PresentationField(name="Health", value=f"-{health_loss}" if health_loss > 0 else "No loss", inline=True),
+                PresentationField(name="Next Step", value=f"If {horse_name} feels ready, try `/ride`."),
+            ),
+        ),
     )
 
 
@@ -1315,6 +1503,11 @@ def ride_horse_flow(
             ride_stat_gain=0,
             energy_loss=0,
             health_loss=0,
+            presentation=_build_presentation(
+                title="Ride Deferred",
+                description=message,
+                accent="warning",
+            ),
         )
 
     # Select the stat to try and increase (confidence or bond).
@@ -1420,6 +1613,25 @@ def ride_horse_flow(
         ride_stat_gain=ride_stat_gain,
         energy_loss=energy_loss,
         health_loss=health_loss,
+        presentation=_build_presentation(
+            title="Ride Complete",
+            description=outcome.story_text,
+            accent="success" if outcome.category in {"excellent", "good"} else "warning",
+            fields=(
+                PresentationField(name="Ride Notes", value=contextual_story),
+                PresentationField(
+                    name="Result",
+                    value=(
+                        f"{selected_stat.capitalize()}: +{ride_stat_gain}\n"
+                        f"Energy: -{energy_loss}\n"
+                        + (f"Health: -{health_loss}" if health_loss > 0 else "Health: no loss")
+                    ),
+                    inline=True,
+                ),
+                PresentationField(name="Next Step", value=f"Use `/horse profile` to check {horse_name}'s updated state."),
+            ),
+            footer=f"Outcome: {outcome.category}",
+        ),
     )
 
 
@@ -1442,6 +1654,11 @@ def stable_roster_flow(
             message=message,
             has_guild_context=False,
             is_empty=True,
+            presentation=_build_presentation(
+                title="Stable Unavailable",
+                description=message,
+                accent="warning",
+            ),
         )
 
     raw_rows = repository.list_adopted_horses_by_guild(guild_id=guild_id)
@@ -1455,6 +1672,11 @@ def stable_roster_flow(
             message=message,
             has_guild_context=True,
             is_empty=True,
+            presentation=_build_presentation(
+                title="Stable Is Quiet",
+                description=message,
+                accent="info",
+            ),
         )
 
     rows: list[dict[str, object]] = []
@@ -1490,6 +1712,19 @@ def stable_roster_flow(
         message="\n".join(lines),
         has_guild_context=True,
         is_empty=False,
+        presentation=_build_presentation(
+            title="Server Stable Roster",
+            description="Here are the horses currently adopted in this server.",
+            accent="info",
+            fields=tuple(
+                PresentationField(
+                    name=f"#{row['horse_id']} - {row['horse_name']}",
+                    value=f"Owner: {row['owner_display_name']}",
+                )
+                for row in rows
+            ),
+            footer="Use `/horse profile` to check on your own companion.",
+        ),
     )
 
 
