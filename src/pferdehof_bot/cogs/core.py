@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from pferdehof_bot.command_registry import ResponseVisibility, get_command_metadata
 from pferdehof_bot.repositories import JsonPlayerRepository
+from pferdehof_bot.services.onboarding import ResponsePresentation
 from pferdehof_bot.services import (
     FileTelemetryLogger,
     admin_rename_horse_flow,
@@ -45,11 +46,38 @@ class CoreCog(commands.Cog):
         self._repository = repository or JsonPlayerRepository(storage_path=DEFAULT_PLAYER_STORAGE_PATH)
         self._telemetry_logger = telemetry_logger or FileTelemetryLogger(DEFAULT_TELEMETRY_STORAGE_PATH)
 
-    async def _send_response(self, interaction: discord.Interaction, command_id: str, message: str) -> None:
+    def _build_embed(self, presentation: ResponsePresentation) -> discord.Embed:
+        """Build a Discord embed from a service presentation payload."""
+        accent = (presentation.accent or "").lower()
+        color_by_accent: dict[str, discord.Color] = {
+            "success": discord.Color.green(),
+            "warning": discord.Color.orange(),
+            "error": discord.Color.red(),
+            "info": discord.Color.blurple(),
+        }
+        embed = discord.Embed(
+            title=presentation.title,
+            description=presentation.description,
+            color=color_by_accent.get(accent, discord.Color.light_grey()),
+        )
+        for field in presentation.fields:
+            embed.add_field(name=field.name, value=field.value, inline=field.inline)
+        if presentation.footer is not None:
+            embed.set_footer(text=presentation.footer)
+        return embed
+
+    async def _send_response(
+        self,
+        interaction: discord.Interaction,
+        command_id: str,
+        message: str,
+        presentation: ResponsePresentation | None = None,
+    ) -> None:
         """Send a response based on command visibility metadata."""
         metadata = get_command_metadata(command_id)
         is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
-        await interaction.response.send_message(message, ephemeral=is_ephemeral)
+        embed = self._build_embed(presentation) if presentation is not None else None
+        await interaction.response.send_message(message, embed=embed, ephemeral=is_ephemeral)
 
     async def _build_owner_display_name_map(
         self,
@@ -91,7 +119,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="start", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="start",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @horse_group.command(name="profile", description="Show your current horse profile")
     async def horse_profile(self, interaction: discord.Interaction) -> None:
@@ -104,7 +137,12 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=display_name,
         )
-        await self._send_response(interaction=interaction, command_id="horse.profile", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.profile",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @horse_group.command(name="view", description="Show current horse candidates")
     async def horse_view(self, interaction: discord.Interaction) -> None:
@@ -118,7 +156,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="horse.view", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.view",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @horse_group.command(name="choose", description="Choose one horse candidate by id")
     @app_commands.describe(candidate_id="Candidate id from /horse view: A, B, or C")
@@ -134,7 +177,12 @@ class CoreCog(commands.Cog):
             candidate_id=candidate_id,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="horse.choose", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.choose",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @horse_group.command(name="name", description="Finalize adoption by naming your horse")
     @app_commands.describe(horse_name="Horse name between 2 and 20 characters")
@@ -150,7 +198,12 @@ class CoreCog(commands.Cog):
             horse_name=horse_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="horse.name", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.name",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @horse_group.command(name="rename", description="Admin-only rename for a player's adopted horse")
     @app_commands.default_permissions(administrator=True)
@@ -166,7 +219,12 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             new_name=new_name,
         )
-        await self._send_response(interaction=interaction, command_id="horse.rename", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.rename",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="greet", description="Greet your adopted horse")
     async def greet(self, interaction: discord.Interaction) -> None:
@@ -180,7 +238,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="greet", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="greet",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="feed", description="Feed your adopted horse to restore energy")
     async def feed(self, interaction: discord.Interaction) -> None:
@@ -194,7 +257,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="feed", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="feed",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="groom", description="Groom your adopted horse to nurture bond and calmness")
     async def groom(self, interaction: discord.Interaction) -> None:
@@ -208,7 +276,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="groom", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="groom",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="rest", description="Let your adopted horse rest and recover health")
     async def rest(self, interaction: discord.Interaction) -> None:
@@ -222,7 +295,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="rest", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="rest",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="train", description="Train your adopted horse to build skill and confidence")
     async def train(self, interaction: discord.Interaction) -> None:
@@ -236,7 +314,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="train", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="train",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="ride", description="Take your adopted horse on a short ride")
     async def ride(self, interaction: discord.Interaction) -> None:
@@ -250,7 +333,12 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(interaction=interaction, command_id="ride", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="ride",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
     @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
     async def stable(self, interaction: discord.Interaction) -> None:
@@ -281,7 +369,12 @@ class CoreCog(commands.Cog):
             telemetry_logger=self._telemetry_logger,
             user_id=interaction.user.id,
         )
-        await self._send_response(interaction=interaction, command_id="stable", message=result.message)
+        await self._send_response(
+            interaction=interaction,
+            command_id="stable",
+            message=result.message,
+            presentation=result.presentation,
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -9,6 +9,7 @@ import discord
 from pferdehof_bot.bot import create_bot, load_extensions
 from pferdehof_bot.cogs.core import CoreCog
 from pferdehof_bot.repositories import JsonPlayerRepository
+from pferdehof_bot.services.onboarding import PresentationField, ResponsePresentation
 
 
 def test_core_cog_registers_slash_commands() -> None:
@@ -73,6 +74,31 @@ class _FakeGuild:
         return self._fetch_results[user_id]
 
 
+class _FakeInteractionResponse:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def send_message(
+        self,
+        content: str,
+        *,
+        embed: discord.Embed | None = None,
+        ephemeral: bool = False,
+    ) -> None:
+        self.calls.append(
+            {
+                "content": content,
+                "embed": embed,
+                "ephemeral": ephemeral,
+            }
+        )
+
+
+class _FakeInteraction:
+    def __init__(self) -> None:
+        self.response = _FakeInteractionResponse()
+
+
 def _build_core_cog(tmp_path: Path) -> CoreCog:
     bot = create_bot()
     repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
@@ -128,3 +154,57 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
 
     assert resolved == {}
     assert guild.fetch_calls == [200, 201]
+
+
+def test_send_response_uses_embed_when_presentation_is_provided(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    presentation = ResponsePresentation(
+        title="Welcome To Pferdehof",
+        description="Three horses are waiting to meet you.",
+        fields=(
+            PresentationField(name="Next Step", value="Run `/horse view` to meet your candidates."),
+        ),
+        accent="success",
+        footer="Adoption journey started",
+    )
+
+    asyncio.run(
+        core_cog._send_response(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="start",
+            message="fallback text",
+            presentation=presentation,
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    assert sent["content"] == "fallback text"
+    assert sent["ephemeral"] is False
+    embed = sent["embed"]
+    assert isinstance(embed, discord.Embed)
+    assert embed.title == "Welcome To Pferdehof"
+    assert embed.description == "Three horses are waiting to meet you."
+    assert len(embed.fields) == 1
+    assert embed.fields[0].name == "Next Step"
+    assert embed.fields[0].value == "Run `/horse view` to meet your candidates."
+
+
+def test_send_response_without_presentation_sends_text_only(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+
+    asyncio.run(
+        core_cog._send_response(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="start",
+            message="text only",
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    assert sent["content"] == "text only"
+    assert sent["embed"] is None
+    assert sent["ephemeral"] is False

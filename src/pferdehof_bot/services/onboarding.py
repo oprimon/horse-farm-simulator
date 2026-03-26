@@ -89,6 +89,26 @@ _RIDE_STAT_NO_GAIN_POOL: tuple[str, ...] = (
 
 
 @dataclass(frozen=True)
+class PresentationField:
+    """Single field entry for structured Discord response rendering."""
+
+    name: str
+    value: str
+    inline: bool = False
+
+
+@dataclass(frozen=True)
+class ResponsePresentation:
+    """Structured presentation payload used by Discord transport renderers."""
+
+    title: str
+    description: str
+    fields: tuple[PresentationField, ...] = ()
+    accent: str | None = None
+    footer: str | None = None
+
+
+@dataclass(frozen=True)
 class StartOnboardingResult:
     """Result payload for `/start` onboarding flow execution."""
 
@@ -96,6 +116,7 @@ class StartOnboardingResult:
     message: str
     already_adopted: bool
     reused_active_session: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +127,7 @@ class ViewCandidatesResult:
     message: str
     has_active_session: bool
     already_adopted: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +141,7 @@ class ChooseCandidateResult:
     invalid_candidate_id: bool
     has_active_session: bool
     already_adopted: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +155,7 @@ class NameHorseResult:
     has_active_session: bool
     has_chosen_candidate: bool
     already_adopted: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -141,6 +165,7 @@ class HorseProfileResult:
     player: PlayerRecord | None
     message: str
     has_adopted_horse: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +175,7 @@ class GreetHorseResult:
     player: PlayerRecord | None
     message: str
     has_adopted_horse: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +186,7 @@ class FeedHorseResult:
     message: str
     has_adopted_horse: bool
     energy_gain: int
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -171,6 +198,7 @@ class GroomHorseResult:
     has_adopted_horse: bool
     groomed_stat: str | None
     stat_gain: int
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -181,6 +209,7 @@ class RestHorseResult:
     message: str
     has_adopted_horse: bool
     health_gain: int
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -195,6 +224,7 @@ class TrainHorseResult:
     confidence_gain: int
     energy_cost: int
     health_loss: int
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -211,6 +241,7 @@ class RideHorseResult:
     ride_stat_gain: int
     energy_loss: int
     health_loss: int
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +252,7 @@ class StableRosterResult:
     message: str
     has_guild_context: bool
     is_empty: bool
+    presentation: ResponsePresentation | None = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +264,7 @@ class AdminRenameHorseResult:
     renamed: bool
     invalid_name: bool
     target_has_horse: bool
+    presentation: ResponsePresentation | None = None
 
 
 def start_onboarding_flow(
@@ -256,6 +289,17 @@ def start_onboarding_flow(
             message=message,
             already_adopted=True,
             reused_active_session=False,
+            presentation=ResponsePresentation(
+                title="Your Stable Is Waiting",
+                description=message,
+                fields=(
+                    PresentationField(
+                        name="Available Commands",
+                        value="Use `/horse profile` to check in and `/greet` to visit your horse.",
+                    ),
+                ),
+                accent="info",
+            ),
         )
 
     if _has_active_onboarding(existing_player):
@@ -270,6 +314,17 @@ def start_onboarding_flow(
             message=message,
             already_adopted=False,
             reused_active_session=True,
+            presentation=ResponsePresentation(
+                title="Adoption In Progress",
+                description=message,
+                fields=(
+                    PresentationField(
+                        name="Next Step",
+                        value="Open your candidate list with `/horse view`.",
+                    ),
+                ),
+                accent="info",
+            ),
         )
 
     candidates = candidate_generator(candidate_seed)
@@ -294,6 +349,18 @@ def start_onboarding_flow(
         message=message,
         already_adopted=False,
         reused_active_session=False,
+        presentation=ResponsePresentation(
+            title="Welcome To Pferdehof",
+            description="Three horses are waiting to meet you.",
+            fields=(
+                PresentationField(
+                    name="Next Step",
+                    value="Run `/horse view` and choose the horse that fits your style.",
+                ),
+            ),
+            accent="success",
+            footer="Your adoption journey has started.",
+        ),
     )
 
 
