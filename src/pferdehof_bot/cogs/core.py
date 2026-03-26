@@ -66,18 +66,82 @@ class CoreCog(commands.Cog):
             embed.set_footer(text=presentation.footer)
         return embed
 
+    def _build_candidate_view(
+        self,
+        *,
+        candidates: list[dict[str, object]],
+        owner_user_id: int,
+    ) -> discord.ui.View | None:
+        """Build a candidate-selection button row for onboarding sessions."""
+        candidate_ids: list[str] = []
+        for candidate in candidates:
+            candidate_id = str(candidate.get("id", "")).upper().strip()
+            if candidate_id in {"A", "B", "C"}:
+                candidate_ids.append(candidate_id)
+
+        if not candidate_ids:
+            return None
+
+        cog = self
+
+        class ChooseCandidateView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+            async def _handle_choice(self, interaction: discord.Interaction, candidate_id: str) -> None:
+                if interaction.user.id != owner_user_id:
+                    await interaction.response.send_message(
+                        "Only the player who opened these candidates can choose from this panel.",
+                        ephemeral=True,
+                    )
+                    return
+
+                guild_id = interaction.guild.id if interaction.guild is not None else None
+                display_name = getattr(interaction.user, "display_name", interaction.user.name)
+                result = choose_candidate_flow(
+                    repository=cog._repository,
+                    user_id=interaction.user.id,
+                    guild_id=guild_id,
+                    display_name=display_name,
+                    candidate_id=candidate_id,
+                    telemetry_logger=cog._telemetry_logger,
+                )
+                await cog._send_response(
+                    interaction=interaction,
+                    command_id="horse.choose",
+                    message=result.message,
+                    presentation=result.presentation,
+                )
+
+        view = ChooseCandidateView()
+        for candidate_id in sorted(set(candidate_ids)):
+
+            async def _callback(interaction: discord.Interaction, selected_id: str = candidate_id) -> None:
+                await view._handle_choice(interaction=interaction, candidate_id=selected_id)
+
+            button = discord.ui.Button(
+                label=f"Adopt {candidate_id}",
+                style=discord.ButtonStyle.primary,
+                custom_id=f"horse_choose_{candidate_id}",
+            )
+            button.callback = _callback
+            view.add_item(button)
+
+        return view
+
     async def _send_response(
         self,
         interaction: discord.Interaction,
         command_id: str,
         message: str,
         presentation: ResponsePresentation | None = None,
+        view: discord.ui.View | None = None,
     ) -> None:
         """Send a response based on command visibility metadata."""
         metadata = get_command_metadata(command_id)
         is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
         embed = self._build_embed(presentation) if presentation is not None else None
-        await interaction.response.send_message(message, embed=embed, ephemeral=is_ephemeral)
+        await interaction.response.send_message(message, embed=embed, view=view, ephemeral=is_ephemeral)
 
     async def _build_owner_display_name_map(
         self,
@@ -156,11 +220,20 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        candidates = []
+        if result.player is not None and result.has_active_session and not result.already_adopted:
+            onboarding_session = result.player.get("onboarding_session") or {}
+            raw_candidates = onboarding_session.get("candidates")
+            if isinstance(raw_candidates, list):
+                candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict)]
+
+        candidate_view = self._build_candidate_view(candidates=candidates, owner_user_id=interaction.user.id)
         await self._send_response(
             interaction=interaction,
             command_id="horse.view",
             message=result.message,
             presentation=result.presentation,
+            view=candidate_view,
         )
 
     @horse_group.command(name="choose", description="Choose one horse candidate by id")

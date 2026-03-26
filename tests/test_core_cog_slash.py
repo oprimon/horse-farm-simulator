@@ -83,12 +83,14 @@ class _FakeInteractionResponse:
         content: str,
         *,
         embed: discord.Embed | None = None,
+        view: discord.ui.View | None = None,
         ephemeral: bool = False,
     ) -> None:
         self.calls.append(
             {
                 "content": content,
                 "embed": embed,
+                "view": view,
                 "ephemeral": ephemeral,
             }
         )
@@ -207,4 +209,30 @@ def test_send_response_without_presentation_sends_text_only(tmp_path) -> None:
     sent = interaction.response.calls[0]
     assert sent["content"] == "text only"
     assert sent["embed"] is None
+    assert sent["view"] is None
     assert sent["ephemeral"] is False
+
+
+def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    candidates = [
+        {"id": "A", "appearance_text": "Chestnut"},
+        {"id": "B", "appearance_text": "Bay"},
+        {"id": "C", "appearance_text": "Grey"},
+    ]
+
+    view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
+
+    assert view is not None
+    assert len(view.children) == 3
+    labels = [item.label for item in view.children if isinstance(item, discord.ui.Button)]
+    assert labels == ["Adopt A", "Adopt B", "Adopt C"]
+
+
+def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    candidates = [{"id": "Z"}]
+
+    view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
+
+    assert view is None
