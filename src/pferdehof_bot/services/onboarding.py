@@ -958,10 +958,11 @@ def horse_profile_flow(
         f"Appearance: {appearance}",
         f"Visible traits: {traits_text}",
         f"Mood: {horse_name} feels {state_presentation.readiness_feel}.",
-        f"Bond: {horse_name} is {state_presentation.bond_feel} with you.",
-        f"Energy: {horse_name} is {state_presentation.energy_feel}.",
-        f"Confidence: {horse_name} is {state_presentation.confidence_feel}.",
-        f"Skill: {horse_name} is {state_presentation.skill_feel}.",
+        f"Bond ({state_presentation.bond_value}): {horse_name} is {state_presentation.bond_feel} with you.",
+        f"Energy ({state_presentation.energy_value}): {horse_name} is {state_presentation.energy_feel}.",
+        f"Health ({state_presentation.health_value}): {horse_name} is {state_presentation.health_feel}.",
+        f"Confidence ({state_presentation.confidence_value}): {horse_name} is {state_presentation.confidence_feel}.",
+        f"Skill ({state_presentation.skill_value}): {horse_name} is {state_presentation.skill_feel}.",
     ]
 
     if state_presentation.recent_activity_text is None:
@@ -1301,7 +1302,11 @@ def train_horse_flow(
     current_skill = _clamp_stat(int(horse.get("skill") or 0))
     current_confidence = _clamp_stat(int(horse.get("confidence") or 0))
 
-    if current_energy < 30 or current_health < 35:
+    # Option A safety rule for training: require enough stats to cover
+    # maximum possible training losses.
+    # - Energy always decreases by up to 10 (1d10), so require at least 10.
+    # - Health has a slight chance to decrease by up to 10 (1d10), so require at least 10.
+    if current_energy < 10 or current_health < 10:
         state_presentation = build_horse_state_presentation(horse)
         recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/train`."
         message = (

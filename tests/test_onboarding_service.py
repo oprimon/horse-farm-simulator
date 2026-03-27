@@ -423,10 +423,11 @@ def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
     assert "Appearance: Chestnut with bright blaze" in result.message
     assert "Visible traits: steady, curious" in result.message
     assert "Mood: Luna feels eager and ready for a confident outing." in result.message
-    assert "Bond: Luna is deeply connected and affectionate with you." in result.message
-    assert "Energy: Luna is bright-eyed and eager to move." in result.message
-    assert "Confidence: Luna is bold and excited to try new things." in result.message
-    assert "Skill: Luna is building good habits and balance." in result.message
+    assert "Bond (80): Luna is deeply connected and affectionate with you." in result.message
+    assert "Energy (72): Luna is bright-eyed and eager to move." in result.message
+    assert "Health (78): Luna is strong and in great shape." in result.message
+    assert "Confidence (68): Luna is bold and excited to try new things." in result.message
+    assert "Skill (61): Luna is building good habits and balance." in result.message
     assert "Recent activity: Shared a gentle arena walk." in result.message
 
 
@@ -957,7 +958,7 @@ def test_train_horse_flow_refuses_when_energy_or_health_is_too_low(tmp_path) -> 
     repository.update_horse_state(
         user_id=942,
         guild_id=943,
-        updates={"energy": 24, "health": 80, "last_trained_at": None, "recent_activity": None},
+        updates={"energy": 9, "health": 80, "last_trained_at": None, "recent_activity": None},
     )
 
     result = train_horse_flow(
@@ -980,7 +981,7 @@ def test_train_horse_flow_refuses_when_energy_or_health_is_too_low(tmp_path) -> 
 
     persisted = repository.get_player(user_id=942, guild_id=943)
     assert persisted is not None
-    assert persisted["horse"]["energy"] == 24
+    assert persisted["horse"]["energy"] == 9
     assert persisted["horse"]["last_trained_at"] is None
     assert persisted["horse"]["recent_activity"] is None
 

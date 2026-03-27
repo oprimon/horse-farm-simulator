@@ -100,7 +100,7 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     assert "Name: Luna" in horse_result.message
     assert horse_result.presentation is not None
     assert "Luna" in horse_result.presentation.title
-    assert len(horse_result.presentation.fields) == 6
+    assert len(horse_result.presentation.fields) == 7
 
     greet_result = greet_horse_flow(
         repository=repository,

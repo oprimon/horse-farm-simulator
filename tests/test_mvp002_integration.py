@@ -185,7 +185,7 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     assert ride_result.outcome.recent_activity_text in profile_result.message
     assert profile_result.presentation is not None
     assert "Luna" in profile_result.presentation.title
-    assert len(profile_result.presentation.fields) == 6
+    assert len(profile_result.presentation.fields) == 7
 
     stable_result = stable_roster_flow(
         repository=repository,
@@ -238,7 +238,7 @@ def test_mvp002_failure_paths_before_adoption_and_train_refusal(tmp_path) -> Non
     repository.update_horse_state(
         user_id=5202,
         guild_id=6201,
-        updates={"energy": 24, "health": 80, "last_trained_at": None, "recent_activity": None},
+        updates={"energy": 9, "health": 80, "last_trained_at": None, "recent_activity": None},
     )
 
     train_result = train_horse_flow(

@@ -19,9 +19,15 @@ class StateEmbedField:
 class HorseStatePresentation:
     """Human-readable state labels derived from internal horse progression values."""
 
+    bond_value: int
+    energy_value: int
+    health_value: int
+    confidence_value: int
+    skill_value: int
     readiness_feel: str
     bond_feel: str
     energy_feel: str
+    health_feel: str
     confidence_feel: str
     skill_feel: str
     recent_activity_text: str | None
@@ -31,10 +37,11 @@ class HorseStatePresentation:
         """Structured field fragments ready for embed rendering."""
         return (
             StateEmbedField(name="Mood", value=self.readiness_feel),
-            StateEmbedField(name="Bond", value=self.bond_feel, inline=True),
-            StateEmbedField(name="Energy", value=self.energy_feel, inline=True),
-            StateEmbedField(name="Confidence", value=self.confidence_feel, inline=True),
-            StateEmbedField(name="Skill", value=self.skill_feel, inline=True),
+            StateEmbedField(name=f"Bond ({self.bond_value})", value=self.bond_feel, inline=True),
+            StateEmbedField(name=f"Energy ({self.energy_value})", value=self.energy_feel, inline=True),
+            StateEmbedField(name=f"Health ({self.health_value})", value=self.health_feel, inline=True),
+            StateEmbedField(name=f"Confidence ({self.confidence_value})", value=self.confidence_feel, inline=True),
+            StateEmbedField(name=f"Skill ({self.skill_value})", value=self.skill_feel, inline=True),
             StateEmbedField(
                 name="Recent Activity",
                 value=(
@@ -56,6 +63,11 @@ def build_horse_state_presentation(horse: Mapping[str, Any]) -> HorseStatePresen
     recent_activity = _normalize_optional_text(horse.get("recent_activity"))
 
     return HorseStatePresentation(
+        bond_value=bond,
+        energy_value=energy,
+        health_value=health,
+        confidence_value=confidence,
+        skill_value=skill,
         readiness_feel=_readiness_feel(energy=energy, health=health, confidence=confidence),
         bond_feel=_band_text(
             value=bond,
@@ -68,6 +80,12 @@ def build_horse_state_presentation(horse: Mapping[str, Any]) -> HorseStatePresen
             low="running low and needs rest",
             mid="comfortable and ready for gentle activity",
             high="bright-eyed and eager to move",
+        ),
+        health_feel=_band_text(
+            value=health,
+            low="a bit fragile and needs careful recovery",
+            mid="recovering well and staying steady",
+            high="strong and in great shape",
         ),
         confidence_feel=_band_text(
             value=confidence,
