@@ -19,7 +19,7 @@ from pferdehof_bot.services.lifecycle import (
     start_onboarding_flow,
     view_candidates_flow,
 )
-from pferdehof_bot.services.onboarding import ResponsePresentation
+from pferdehof_bot.services.presentation_models import ResponsePresentation
 from pferdehof_bot.services.progression import ride_horse_flow, train_horse_flow
 from pferdehof_bot.services.stable import stable_roster_flow
 from pferdehof_bot.services.telemetry import FileTelemetryLogger

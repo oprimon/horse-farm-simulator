@@ -1,25 +1,5 @@
-"""Shared onboarding presentation models."""
+"""Backward-compatible re-export for presentation models."""
 
-from __future__ import annotations
+from .presentation_models import PresentationField, ResponsePresentation
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class PresentationField:
-    """Single field entry for structured Discord response rendering."""
-
-    name: str
-    value: str
-    inline: bool = False
-
-
-@dataclass(frozen=True)
-class ResponsePresentation:
-    """Structured presentation payload used by Discord transport renderers."""
-
-    title: str
-    description: str
-    fields: tuple[PresentationField, ...] = ()
-    accent: str | None = None
-    footer: str | None = None
+__all__ = ["PresentationField", "ResponsePresentation"]

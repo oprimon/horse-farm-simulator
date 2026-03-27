@@ -8,7 +8,7 @@ from typing import Callable
 from pferdehof_bot.repositories import JsonPlayerRepository
 
 from .flow_utils import emit_telemetry
-from .onboarding import PresentationField, ResponsePresentation
+from .presentation_models import PresentationField, ResponsePresentation
 from .telemetry import TelemetryLogger
 
 

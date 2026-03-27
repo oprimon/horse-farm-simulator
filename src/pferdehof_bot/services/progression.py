@@ -18,7 +18,7 @@ from .flow_utils import (
     slight_chance_to_decrease,
     timestamp_now,
 )
-from .onboarding import PresentationField, ResponsePresentation
+from .presentation_models import PresentationField, ResponsePresentation
 from .ride_outcomes import RideOutcomeResult, select_ride_outcome
 from .state_presentation import build_horse_state_presentation
 from .telemetry import TelemetryLogger

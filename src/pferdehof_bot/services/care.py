@@ -10,7 +10,7 @@ from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.repositories.player_repository import PlayerRecord
 
 from .flow_utils import clamp_stat, emit_telemetry, roll_d10, roll_d100, timestamp_now
-from .onboarding import PresentationField, ResponsePresentation
+from .presentation_models import PresentationField, ResponsePresentation
 from .telemetry import TelemetryLogger
 
 

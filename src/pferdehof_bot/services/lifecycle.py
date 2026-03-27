@@ -12,7 +12,7 @@ from pferdehof_bot.repositories.player_repository import CandidateRecord, Player
 from .candidate_generator import generate_candidate_horses
 from .flow_utils import emit_telemetry
 from .moderation import contains_blocked_name_term, validate_horse_name
-from .onboarding import PresentationField, ResponsePresentation
+from .presentation_models import PresentationField, ResponsePresentation
 from .state_presentation import build_horse_state_presentation
 from .telemetry import TelemetryLogger
 
