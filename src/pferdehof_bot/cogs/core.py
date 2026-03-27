@@ -1,6 +1,7 @@
 """Core bot commands and baseline setup."""
 
 from pathlib import Path
+from typing import Callable, Protocol
 
 import discord
 from discord import app_commands
@@ -29,6 +30,34 @@ from pferdehof_bot.services import (
 
 DEFAULT_PLAYER_STORAGE_PATH = Path("data") / "players.json"
 DEFAULT_TELEMETRY_STORAGE_PATH = Path("data") / "telemetry.jsonl"
+
+
+class _FlowResult(Protocol):
+    """Minimal shape every flow result returned by services must provide."""
+
+    @property
+    def message(self) -> str:
+        ...
+
+    @property
+    def presentation(self) -> ResponsePresentation | None:
+        ...
+
+
+class _FollowupFlowResult(_FlowResult, Protocol):
+    """Flow result shape required for follow-up action-view resolution."""
+
+    @property
+    def player(self) -> dict[str, object] | None:
+        ...
+
+    @property
+    def has_adopted_horse(self) -> bool:
+        ...
+
+    @property
+    def blocked_by_readiness(self) -> bool:
+        ...
 
 
 class CoreCog(commands.Cog):
@@ -65,6 +94,63 @@ class CoreCog(commands.Cog):
         if presentation.footer is not None:
             embed.set_footer(text=presentation.footer)
         return embed
+
+    def _resolve_interaction_context(self, interaction: discord.Interaction) -> tuple[int | None, str]:
+        """Return common per-interaction context used by service flows."""
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        return guild_id, display_name
+
+    async def _respond_with_result(
+        self,
+        *,
+        interaction: discord.Interaction,
+        command_id: str,
+        result: _FlowResult,
+        owner_user_id: int | None = None,
+        view: discord.ui.View | None = None,
+    ) -> None:
+        """Canonical response renderer for slash and button-triggered flows."""
+        response_view = view
+        if response_view is None and owner_user_id is not None and command_id in {"feed", "groom", "train", "ride"}:
+            followup_result = self._as_followup_result(result)
+            if followup_result is not None:
+                response_view = self._build_followup_view(
+                    command_id=command_id,
+                    result=followup_result,
+                    owner_user_id=owner_user_id,
+                )
+
+        await self._send_response(
+            interaction=interaction,
+            command_id=command_id,
+            message=result.message,
+            presentation=result.presentation,
+            view=response_view,
+        )
+
+    async def _execute_owner_guarded_flow(
+        self,
+        *,
+        interaction: discord.Interaction,
+        owner_user_id: int,
+        command_id: str,
+        wrong_user_message: str,
+        flow_runner: Callable[[int | None, str], _FlowResult],
+    ) -> None:
+        """Run a flow only for owner, then render through the canonical responder."""
+        if interaction.user.id != owner_user_id:
+            await interaction.response.send_message(wrong_user_message, ephemeral=True)
+            return
+
+        guild_id, display_name = self._resolve_interaction_context(interaction)
+        result = flow_runner(guild_id, display_name)
+        await self._respond_with_result(
+            interaction=interaction,
+            command_id=command_id,
+            result=result,
+            owner_user_id=interaction.user.id,
+        )
 
     def _build_candidate_view(
         self,
@@ -147,38 +233,19 @@ class CoreCog(commands.Cog):
             def __init__(self) -> None:
                 super().__init__(timeout=300)
 
-            async def _guard(self, interaction: discord.Interaction) -> bool:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the horse's owner can use these actions.",
-                        ephemeral=True,
-                    )
-                    return False
-                return True
-
             async def _run(self, interaction: discord.Interaction, flow_fn, command_id: str) -> None:
-                if not await self._guard(interaction):
-                    return
-                guild_id = interaction.guild.id if interaction.guild is not None else None
-                display_name = getattr(interaction.user, "display_name", interaction.user.name)
-                result = flow_fn(
-                    repository=cog._repository,
-                    user_id=interaction.user.id,
-                    guild_id=guild_id,
-                    display_name=display_name,
-                    telemetry_logger=cog._telemetry_logger,
-                )
-                followup_view = cog._build_followup_view(
-                    command_id=command_id,
-                    result=result,
-                    owner_user_id=interaction.user.id,
-                )
-                await cog._send_response(
+                await cog._execute_owner_guarded_flow(
                     interaction=interaction,
+                    owner_user_id=owner_user_id,
                     command_id=command_id,
-                    message=result.message,
-                    presentation=result.presentation,
-                    view=followup_view,
+                    wrong_user_message="Only the horse's owner can use these actions.",
+                    flow_runner=lambda guild_id, display_name: flow_fn(
+                        repository=cog._repository,
+                        user_id=interaction.user.id,
+                        guild_id=guild_id,
+                        display_name=display_name,
+                        telemetry_logger=cog._telemetry_logger,
+                    ),
                 )
 
         view = ProfileActionView()
@@ -215,38 +282,19 @@ class CoreCog(commands.Cog):
             def __init__(self) -> None:
                 super().__init__(timeout=300)
 
-            async def _guard(self, interaction: discord.Interaction) -> bool:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the horse's owner can use these actions.",
-                        ephemeral=True,
-                    )
-                    return False
-                return True
-
             async def _run(self, interaction: discord.Interaction, flow_fn, command_id: str) -> None:
-                if not await self._guard(interaction):
-                    return
-                guild_id = interaction.guild.id if interaction.guild is not None else None
-                display_name = getattr(interaction.user, "display_name", interaction.user.name)
-                result = flow_fn(
-                    repository=cog._repository,
-                    user_id=interaction.user.id,
-                    guild_id=guild_id,
-                    display_name=display_name,
-                    telemetry_logger=cog._telemetry_logger,
-                )
-                followup_view = cog._build_followup_view(
-                    command_id=command_id,
-                    result=result,
-                    owner_user_id=interaction.user.id,
-                )
-                await cog._send_response(
+                await cog._execute_owner_guarded_flow(
                     interaction=interaction,
+                    owner_user_id=owner_user_id,
                     command_id=command_id,
-                    message=result.message,
-                    presentation=result.presentation,
-                    view=followup_view,
+                    wrong_user_message="Only the horse's owner can use these actions.",
+                    flow_runner=lambda guild_id, display_name: flow_fn(
+                        repository=cog._repository,
+                        user_id=interaction.user.id,
+                        guild_id=guild_id,
+                        display_name=display_name,
+                        telemetry_logger=cog._telemetry_logger,
+                    ),
                 )
 
         view = RecoveryActionView()
@@ -280,38 +328,19 @@ class CoreCog(commands.Cog):
             def __init__(self) -> None:
                 super().__init__(timeout=300)
 
-            async def _guard(self, interaction: discord.Interaction) -> bool:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the horse's owner can use this action.",
-                        ephemeral=True,
-                    )
-                    return False
-                return True
-
             async def _run(self, interaction: discord.Interaction) -> None:
-                if not await self._guard(interaction):
-                    return
-                guild_id = interaction.guild.id if interaction.guild is not None else None
-                display_name = getattr(interaction.user, "display_name", interaction.user.name)
-                result = ride_horse_flow(
-                    repository=cog._repository,
-                    user_id=interaction.user.id,
-                    guild_id=guild_id,
-                    display_name=display_name,
-                    telemetry_logger=cog._telemetry_logger,
-                )
-                followup_view = cog._build_followup_view(
-                    command_id="ride",
-                    result=result,
-                    owner_user_id=interaction.user.id,
-                )
-                await cog._send_response(
+                await cog._execute_owner_guarded_flow(
                     interaction=interaction,
+                    owner_user_id=owner_user_id,
                     command_id="ride",
-                    message=result.message,
-                    presentation=result.presentation,
-                    view=followup_view,
+                    wrong_user_message="Only the horse's owner can use this action.",
+                    flow_runner=lambda guild_id, display_name: ride_horse_flow(
+                        repository=cog._repository,
+                        user_id=interaction.user.id,
+                        guild_id=guild_id,
+                        display_name=display_name,
+                        telemetry_logger=cog._telemetry_logger,
+                    ),
                 )
 
         view = RideActionView()
@@ -368,13 +397,13 @@ class CoreCog(commands.Cog):
         self,
         *,
         command_id: str,
-        result: object,
+        result: _FollowupFlowResult,
         owner_user_id: int,
     ) -> discord.ui.View | None:
         """Build context-sensitive follow-up action views for command results."""
-        has_adopted_horse = bool(getattr(result, "has_adopted_horse", False))
-        blocked_by_readiness = bool(getattr(result, "blocked_by_readiness", False))
-        player = getattr(result, "player", None)
+        has_adopted_horse = result.has_adopted_horse
+        blocked_by_readiness = result.blocked_by_readiness
+        player = result.player
 
         if command_id in {"feed", "groom"}:
             return self._build_ride_view(owner_user_id=owner_user_id) if self._can_ride_from_player(player) else None
@@ -389,10 +418,19 @@ class CoreCog(commands.Cog):
 
         return None
 
+    def _as_followup_result(self, result: _FlowResult) -> _FollowupFlowResult | None:
+        """Return typed follow-up view input when result supports follow-up decision fields."""
+        if not hasattr(result, "player"):
+            return None
+        if not hasattr(result, "has_adopted_horse"):
+            return None
+        if not hasattr(result, "blocked_by_readiness"):
+            return None
+        return result  # type: ignore[return-value]
+
     async def _respond_with_profile(self, interaction: discord.Interaction) -> None:
         """Render `/horse profile` response for slash command and profile button flows."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = horse_profile_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -404,11 +442,10 @@ class CoreCog(commands.Cog):
             if result.has_adopted_horse
             else None
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="horse.profile",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
             view=profile_view,
         )
 
@@ -468,8 +505,7 @@ class CoreCog(commands.Cog):
     @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
     async def start(self, interaction: discord.Interaction) -> None:
         """Start or resume player onboarding for horse adoption."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = start_onboarding_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -477,11 +513,10 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="start",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @horse_group.command(name="profile", description="Show your current horse profile")
@@ -492,8 +527,7 @@ class CoreCog(commands.Cog):
     @horse_group.command(name="view", description="Show current horse candidates")
     async def horse_view(self, interaction: discord.Interaction) -> None:
         """Display current onboarding horse candidates."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = view_candidates_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -509,11 +543,10 @@ class CoreCog(commands.Cog):
                 candidates = [candidate for candidate in raw_candidates if isinstance(candidate, dict)]
 
         candidate_view = self._build_candidate_view(candidates=candidates, owner_user_id=interaction.user.id)
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="horse.view",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
             view=candidate_view,
         )
 
@@ -521,8 +554,7 @@ class CoreCog(commands.Cog):
     @app_commands.describe(candidate_id="Candidate id from /horse view: A, B, or C")
     async def horse_choose(self, interaction: discord.Interaction, candidate_id: str) -> None:
         """Choose and lock a horse candidate by id."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = choose_candidate_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -531,19 +563,17 @@ class CoreCog(commands.Cog):
             candidate_id=candidate_id,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="horse.choose",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @horse_group.command(name="name", description="Finalize adoption by naming your horse")
     @app_commands.describe(horse_name="Horse name between 2 and 20 characters")
     async def horse_name(self, interaction: discord.Interaction, horse_name: str) -> None:
         """Name the selected onboarding candidate and finalize adoption."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = name_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -552,11 +582,10 @@ class CoreCog(commands.Cog):
             horse_name=horse_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="horse.name",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @horse_group.command(name="rename", description="Admin-only rename for a player's adopted horse")
@@ -564,7 +593,7 @@ class CoreCog(commands.Cog):
     @app_commands.describe(target_user_id="User id of the horse owner", new_name="New horse name")
     async def horse_rename_admin(self, interaction: discord.Interaction, target_user_id: int, new_name: str) -> None:
         """Admin override to rename another player's adopted horse."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
+        guild_id, _ = self._resolve_interaction_context(interaction)
         admin_display_name = getattr(interaction.user, "display_name", interaction.user.name)
         result = admin_rename_horse_flow(
             repository=self._repository,
@@ -573,18 +602,16 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             new_name=new_name,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="horse.rename",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @app_commands.command(name="greet", description="Greet your adopted horse")
     async def greet(self, interaction: discord.Interaction) -> None:
         """Greet an adopted horse with a lightweight personalized interaction."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = greet_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -592,18 +619,16 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="greet",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @app_commands.command(name="feed", description="Feed your adopted horse to restore energy")
     async def feed(self, interaction: discord.Interaction) -> None:
         """Feed an adopted horse and persist the latest care activity."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = feed_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -611,24 +636,17 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        ride_view = self._build_followup_view(
+        await self._respond_with_result(
+            interaction=interaction,
             command_id="feed",
             result=result,
             owner_user_id=interaction.user.id,
-        )
-        await self._send_response(
-            interaction=interaction,
-            command_id="feed",
-            message=result.message,
-            presentation=result.presentation,
-            view=ride_view,
         )
 
     @app_commands.command(name="groom", description="Groom your adopted horse to nurture bond and calmness")
     async def groom(self, interaction: discord.Interaction) -> None:
         """Groom an adopted horse and persist the latest care activity."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = groom_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -636,24 +654,17 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        ride_view = self._build_followup_view(
+        await self._respond_with_result(
+            interaction=interaction,
             command_id="groom",
             result=result,
             owner_user_id=interaction.user.id,
-        )
-        await self._send_response(
-            interaction=interaction,
-            command_id="groom",
-            message=result.message,
-            presentation=result.presentation,
-            view=ride_view,
         )
 
     @app_commands.command(name="rest", description="Let your adopted horse rest and recover health")
     async def rest(self, interaction: discord.Interaction) -> None:
         """Rest an adopted horse and persist the latest recovery activity."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = rest_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -661,18 +672,16 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="rest",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
         )
 
     @app_commands.command(name="train", description="Train your adopted horse to build skill and confidence")
     async def train(self, interaction: discord.Interaction) -> None:
         """Train an adopted horse with progression, readiness checks, and tradeoffs."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = train_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -680,24 +689,17 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        action_view = self._build_followup_view(
+        await self._respond_with_result(
+            interaction=interaction,
             command_id="train",
             result=result,
             owner_user_id=interaction.user.id,
-        )
-        await self._send_response(
-            interaction=interaction,
-            command_id="train",
-            message=result.message,
-            presentation=result.presentation,
-            view=action_view,
         )
 
     @app_commands.command(name="ride", description="Take your adopted horse on a short ride")
     async def ride(self, interaction: discord.Interaction) -> None:
         """Take an adopted horse on a ride and generate a story outcome."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        guild_id, display_name = self._resolve_interaction_context(interaction)
         result = ride_horse_flow(
             repository=self._repository,
             user_id=interaction.user.id,
@@ -705,17 +707,11 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        action_view = self._build_followup_view(
+        await self._respond_with_result(
+            interaction=interaction,
             command_id="ride",
             result=result,
             owner_user_id=interaction.user.id,
-        )
-        await self._send_response(
-            interaction=interaction,
-            command_id="ride",
-            message=result.message,
-            presentation=result.presentation,
-            view=action_view,
         )
 
     @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
@@ -748,11 +744,10 @@ class CoreCog(commands.Cog):
             user_id=interaction.user.id,
         )
         stable_view = self._build_stable_view() if result.has_guild_context else None
-        await self._send_response(
+        await self._respond_with_result(
             interaction=interaction,
             command_id="stable",
-            message=result.message,
-            presentation=result.presentation,
+            result=result,
             view=stable_view,
         )
 

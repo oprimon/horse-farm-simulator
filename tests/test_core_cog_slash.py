@@ -158,6 +158,28 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
     assert guild.fetch_calls == [200, 201]
 
 
+def test_resolve_interaction_context_uses_display_name_when_available(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(name="UserName", display_name="Display Name")
+    interaction.guild = SimpleNamespace(id=777)
+
+    guild_id, display_name = core_cog._resolve_interaction_context(interaction)  # type: ignore[arg-type]
+
+    assert guild_id == 777
+    assert display_name == "Display Name"
+
+
+def test_as_followup_result_returns_none_for_non_followup_result(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+
+    result = core_cog._as_followup_result(
+        SimpleNamespace(message="ok", presentation=None)  # type: ignore[arg-type]
+    )
+
+    assert result is None
+
+
 def test_send_response_uses_embed_when_presentation_is_provided(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     interaction = _FakeInteraction()
@@ -235,7 +257,13 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     intruder_interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
     intruder_interaction.guild = None
 
-    asyncio.run(view._guard(intruder_interaction))  # type: ignore[arg-type]
+    asyncio.run(
+        view._run(
+            intruder_interaction,  # type: ignore[arg-type]
+            lambda **_: None,
+            "feed",
+        )
+    )
     assert len(intruder_response.calls) == 1
     assert intruder_response.calls[0]["ephemeral"] is True
 
