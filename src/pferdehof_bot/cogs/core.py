@@ -388,6 +388,38 @@ class CoreCog(commands.Cog):
             raise RuntimeError("Expected ride view to include at least one action.")
         return ride_view
 
+    def _build_post_ride_profile_view(self, *, owner_user_id: int) -> discord.ui.View:
+        """Build a single quick-action Profile button for successful ride results."""
+        cog = self
+
+        class PostRideProfileView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+            async def _run(self, interaction: discord.Interaction) -> None:
+                if interaction.user.id != owner_user_id:
+                    await interaction.response.send_message(
+                        "Only the horse's owner can use this action.",
+                        ephemeral=True,
+                    )
+                    return
+
+                await cog._respond_with_profile(interaction)
+
+        view = PostRideProfileView()
+
+        async def _callback(interaction: discord.Interaction) -> None:
+            await view._run(interaction)
+
+        button = discord.ui.Button(
+            label="🐎 Profile",
+            style=discord.ButtonStyle.primary,
+            custom_id="post_ride_profile",
+        )
+        button.callback = _callback
+        view.add_item(button)
+        return view
+
     def _build_stable_view(self) -> discord.ui.View:
         """Build stable-level quick actions."""
         cog = self
@@ -463,7 +495,9 @@ class CoreCog(commands.Cog):
             return self._build_ride_view(owner_user_id=owner_user_id) if self._can_ride_from_player(player) else None
 
         if command_id == "ride":
-            return self._build_recovery_view(owner_user_id=owner_user_id) if has_adopted_horse and blocked_by_readiness else None
+            if has_adopted_horse and blocked_by_readiness:
+                return self._build_recovery_view(owner_user_id=owner_user_id)
+            return self._build_post_ride_profile_view(owner_user_id=owner_user_id) if has_adopted_horse else None
 
         return None
 

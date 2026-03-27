@@ -304,6 +304,31 @@ def test_build_stable_view_has_profile_button(tmp_path) -> None:
     assert buttons[0].label == "🐎 Profile"
 
 
+def test_build_post_ride_profile_view_has_single_profile_button(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_post_ride_profile_view(owner_user_id=101)
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 1
+    assert buttons[0].label == "🐎 Profile"
+
+
+def test_build_post_ride_profile_view_rejects_wrong_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_post_ride_profile_view(owner_user_id=101)
+
+    intruder_response = _FakeInteractionResponse()
+    intruder_interaction = _FakeInteraction()
+    intruder_interaction.response = intruder_response
+    intruder_interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
+    intruder_interaction.guild = None
+
+    asyncio.run(view._run(intruder_interaction))  # type: ignore[arg-type]
+
+    assert len(intruder_response.calls) == 1
+    assert intruder_response.calls[0]["ephemeral"] is True
+
+
 def test_build_ride_view_has_single_ride_button(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     view = core_cog._build_ride_view(owner_user_id=101)
@@ -454,6 +479,22 @@ def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> Non
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
     labels = [btn.label for btn in buttons]
     assert labels == ["🌾 Feed", "😴 Rest"]
+
+
+def test_build_followup_view_returns_profile_for_successful_ride(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        has_adopted_horse=True,
+        blocked_by_readiness=False,
+        player={"adopted": True, "horse": {"energy": 40, "health": 70}},
+    )
+
+    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+
+    assert view is not None
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🐎 Profile"]
 
 
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
