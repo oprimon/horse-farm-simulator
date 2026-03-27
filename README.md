@@ -246,6 +246,21 @@ Analysis instructions:
 - pyproject.toml: Packaging and tooling config
 - src/pferdehof_bot/bot.py: Bot factory and extension loading
 - src/pferdehof_bot/cogs/core.py: Command handlers
-- src/pferdehof_bot/services/: Onboarding and interaction logic
+- src/pferdehof_bot/services/: Domain service layer split by workflow responsibility
 - src/pferdehof_bot/repositories/: Persistence layer
 - tests/: Unit and integration tests
+
+### Service Architecture
+
+The service layer is intentionally split so each module owns one workflow surface:
+
+- src/pferdehof_bot/services/lifecycle.py: Onboarding lifecycle and profile flows (`/start`, candidate selection, naming, greet, profile, admin rename)
+- src/pferdehof_bot/services/care.py: Care loops (`/feed`, `/groom`, `/rest`)
+- src/pferdehof_bot/services/progression.py: Training and ride progression (`/train`, `/ride`)
+- src/pferdehof_bot/services/stable.py: Guild stable roster flow (`/stable`)
+- src/pferdehof_bot/services/presentation_models.py: Shared response presentation dataclasses used by all workflow modules
+- src/pferdehof_bot/services/flow_utils.py: Shared helper utilities used across flow modules
+- src/pferdehof_bot/services/state_presentation.py: Horse state-to-text mapping helpers for profile and ride summaries
+- src/pferdehof_bot/services/telemetry.py: Telemetry payload assembly and logging adapters
+
+`src/pferdehof_bot/services/__init__.py` remains available as a convenience import surface, while internal modules and tests prefer direct imports from concrete service modules.
