@@ -1352,7 +1352,7 @@ def test_ride_horse_flow_blocks_when_max_possible_losses_not_coverable(tmp_path)
     assert result.ride_stat_gain == 0
     assert result.energy_loss == 0
     assert result.health_loss == 0
-    assert "at least 30 energy and 10 health" in result.message
+    assert "tired and asks for an easy, caring day" in result.message
     assert "/feed" in result.message
     assert "/rest" in result.message
 

@@ -1484,7 +1484,7 @@ def ride_horse_flow(
         recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/ride`."
         message = (
             f"You decide not to ride {horse_name} right now. "
-            f"{horse_name} feels {state_presentation.readiness_feel}, and a safe ride needs at least 30 energy and 10 health. "
+            f"{horse_name} feels {state_presentation.readiness_feel}. "
             f"Recovery Tip: {recovery_guidance}"
         )
         return RideHorseResult(
@@ -1501,7 +1501,7 @@ def ride_horse_flow(
                 title="Ride Deferred",
                 description=(
                     f"You decide not to ride {horse_name} right now. "
-                    f"{horse_name} feels {state_presentation.readiness_feel}, and a safe ride needs at least 30 energy and 10 health."
+                    f"{horse_name} feels {state_presentation.readiness_feel}."
                 ),
                 accent="warning",
                 fields=(
