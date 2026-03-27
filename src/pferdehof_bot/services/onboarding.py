@@ -1306,7 +1306,8 @@ def train_horse_flow(
         recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/train`."
         message = (
             f"You hold off on training {horse_name} for now. "
-            f"{horse_name} feels {state_presentation.readiness_feel}. {recovery_guidance}"
+            f"{horse_name} feels {state_presentation.readiness_feel}. "
+            f"Recovery Tip: {recovery_guidance}"
         )
         return TrainHorseResult(
             player=player,
@@ -1319,7 +1320,10 @@ def train_horse_flow(
             health_loss=0,
             presentation=_build_presentation(
                 title="Training Deferred",
-                description=message,
+                description=(
+                    f"You hold off on training {horse_name} for now. "
+                    f"{horse_name} feels {state_presentation.readiness_feel}."
+                ),
                 accent="warning",
                 fields=(
                     PresentationField(name="Recovery Tip", value=recovery_guidance),
