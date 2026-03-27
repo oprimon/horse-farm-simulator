@@ -113,7 +113,7 @@ class CoreCog(commands.Cog):
         """Canonical response renderer for slash and button-triggered flows."""
         response_view = view
         if response_view is None and owner_user_id is not None and command_id in {"feed", "groom", "rest", "train", "ride"}:
-            followup_result = self._as_followup_result(result)
+            followup_result = self._as_followup_result(command_id=command_id, result=result)
             if followup_result is not None:
                 response_view = self._build_followup_view(
                     command_id=command_id,
@@ -442,13 +442,13 @@ class CoreCog(commands.Cog):
         self,
         *,
         command_id: str,
-        result: _FollowupFlowResult,
+        result: _FlowResult,
         owner_user_id: int,
     ) -> discord.ui.View | None:
         """Build context-sensitive follow-up action views for command results."""
-        has_adopted_horse = result.has_adopted_horse
-        blocked_by_readiness = result.blocked_by_readiness
-        player = result.player
+        has_adopted_horse = bool(getattr(result, "has_adopted_horse", False))
+        blocked_by_readiness = bool(getattr(result, "blocked_by_readiness", False))
+        player = getattr(result, "player", None)
 
         if command_id in {"feed", "groom", "rest"}:
             return self._build_progression_view(
@@ -467,15 +467,15 @@ class CoreCog(commands.Cog):
 
         return None
 
-    def _as_followup_result(self, result: _FlowResult) -> _FollowupFlowResult | None:
-        """Return typed follow-up view input when result supports follow-up decision fields."""
+    def _as_followup_result(self, *, command_id: str, result: _FlowResult) -> _FlowResult | None:
+        """Return follow-up view input when a result exposes the fields needed for that command."""
         if not hasattr(result, "player"):
             return None
         if not hasattr(result, "has_adopted_horse"):
             return None
-        if not hasattr(result, "blocked_by_readiness"):
+        if command_id in {"train", "ride"} and not hasattr(result, "blocked_by_readiness"):
             return None
-        return result  # type: ignore[return-value]
+        return result
 
     async def _respond_with_profile(self, interaction: discord.Interaction) -> None:
         """Render `/horse profile` response for slash command and profile button flows."""

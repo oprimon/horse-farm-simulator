@@ -174,10 +174,27 @@ def test_as_followup_result_returns_none_for_non_followup_result(tmp_path) -> No
     core_cog = _build_core_cog(tmp_path)
 
     result = core_cog._as_followup_result(
-        SimpleNamespace(message="ok", presentation=None)  # type: ignore[arg-type]
+        command_id="feed",
+        result=SimpleNamespace(message="ok", presentation=None)  # type: ignore[arg-type]
     )
 
     assert result is None
+
+
+def test_as_followup_result_accepts_care_result_without_blocked_by_readiness(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+
+    result = core_cog._as_followup_result(
+        command_id="rest",
+        result=SimpleNamespace(
+            message="ok",
+            presentation=None,
+            player={"adopted": True, "horse": {"energy": 63, "health": 99}},
+            has_adopted_horse=True,
+        ),  # type: ignore[arg-type]
+    )
+
+    assert result is not None
 
 
 def test_send_response_uses_embed_when_presentation_is_provided(tmp_path) -> None:
@@ -364,6 +381,35 @@ def test_respond_with_result_builds_followup_view_for_rest_when_ready(tmp_path) 
         core_cog._respond_with_result(
             interaction=interaction,  # type: ignore[arg-type]
             command_id="rest",
+            result=result,  # type: ignore[arg-type]
+            owner_user_id=101,
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    view = sent["view"]
+    assert isinstance(view, discord.ui.View)
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🎓 Train", "🐎 Ride"]
+
+
+def test_respond_with_result_builds_followup_view_for_care_result_without_blocked_flag(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+
+    result = SimpleNamespace(
+        message="ok",
+        presentation=None,
+        has_adopted_horse=True,
+        player={"adopted": True, "horse": {"energy": 63, "health": 99}},
+    )
+
+    asyncio.run(
+        core_cog._respond_with_result(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="groom",
             result=result,  # type: ignore[arg-type]
             owner_user_id=101,
         )
