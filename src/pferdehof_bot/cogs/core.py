@@ -139,6 +139,68 @@ class CoreCog(commands.Cog):
 
         return view
 
+    def _build_profile_view(self, *, owner_user_id: int) -> discord.ui.View:
+        """Build quick-action buttons for the horse profile embed."""
+        cog = self
+
+        class ProfileActionView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+            async def _guard(self, interaction: discord.Interaction) -> bool:
+                if interaction.user.id != owner_user_id:
+                    await interaction.response.send_message(
+                        "Only the horse's owner can use these actions.",
+                        ephemeral=True,
+                    )
+                    return False
+                return True
+
+            async def _run(self, interaction: discord.Interaction, flow_fn, command_id: str) -> None:
+                if not await self._guard(interaction):
+                    return
+                guild_id = interaction.guild.id if interaction.guild is not None else None
+                display_name = getattr(interaction.user, "display_name", interaction.user.name)
+                result = flow_fn(
+                    repository=cog._repository,
+                    user_id=interaction.user.id,
+                    guild_id=guild_id,
+                    display_name=display_name,
+                    telemetry_logger=cog._telemetry_logger,
+                )
+                await cog._send_response(
+                    interaction=interaction,
+                    command_id=command_id,
+                    message=result.message,
+                    presentation=result.presentation,
+                )
+
+        view = ProfileActionView()
+        actions: list[tuple[str, str, object, discord.ButtonStyle]] = [
+            ("🌾 Feed",  "feed",  feed_horse_flow,  discord.ButtonStyle.success),
+            ("🪮 Groom", "groom", groom_horse_flow, discord.ButtonStyle.success),
+            ("😴 Rest",  "rest",  rest_horse_flow,  discord.ButtonStyle.primary),
+            ("🎓 Train", "train", train_horse_flow, discord.ButtonStyle.primary),
+            ("🐎 Ride",  "ride",  ride_horse_flow,  discord.ButtonStyle.danger),
+        ]
+        for label, cmd_id, flow_fn, style in actions:
+            async def _callback(
+                interaction: discord.Interaction,
+                _flow=flow_fn,
+                _cmd=cmd_id,
+            ) -> None:
+                await view._run(interaction, _flow, _cmd)
+
+            button = discord.ui.Button(
+                label=label,
+                style=style,
+                custom_id=f"profile_{cmd_id}",
+            )
+            button.callback = _callback
+            view.add_item(button)
+
+        return view
+
     async def _send_response(
         self,
         interaction: discord.Interaction,
@@ -151,10 +213,15 @@ class CoreCog(commands.Cog):
         metadata = get_command_metadata(command_id)
         is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
         embed = self._build_embed(presentation) if presentation is not None else None
-        kwargs: dict[str, object] = {"embed": embed, "ephemeral": is_ephemeral}
+        # When an embed is present, suppress the plain-text content so Discord
+        # does not render both the text and the card side-by-side.
+        content: str | None = None if embed is not None else message
+        kwargs: dict[str, object] = {"ephemeral": is_ephemeral}
+        if embed is not None:
+            kwargs["embed"] = embed
         if view is not None:
             kwargs["view"] = view
-        await interaction.response.send_message(message, **kwargs)
+        await interaction.response.send_message(content, **kwargs)
 
     async def _build_owner_display_name_map(
         self,
@@ -214,11 +281,17 @@ class CoreCog(commands.Cog):
             guild_id=guild_id,
             display_name=display_name,
         )
+        profile_view = (
+            self._build_profile_view(owner_user_id=interaction.user.id)
+            if result.has_adopted_horse
+            else None
+        )
         await self._send_response(
             interaction=interaction,
             command_id="horse.profile",
             message=result.message,
             presentation=result.presentation,
+            view=profile_view,
         )
 
     @horse_group.command(name="view", description="Show current horse candidates")

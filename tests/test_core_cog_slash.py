@@ -182,7 +182,8 @@ def test_send_response_uses_embed_when_presentation_is_provided(tmp_path) -> Non
 
     assert len(interaction.response.calls) == 1
     sent = interaction.response.calls[0]
-    assert sent["content"] == "fallback text"
+    # embed is present → plain text content is suppressed (None)
+    assert sent["content"] is None
     assert sent["ephemeral"] is False
     embed = sent["embed"]
     assert isinstance(embed, discord.Embed)
@@ -211,6 +212,32 @@ def test_send_response_without_presentation_sends_text_only(tmp_path) -> None:
     assert sent["embed"] is None
     assert sent["view"] is None
     assert sent["ephemeral"] is False
+
+
+def test_build_profile_view_has_five_action_buttons(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_profile_view(owner_user_id=101)
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 5
+    labels = [btn.label for btn in buttons]
+    assert "🌾 Feed" in labels
+    assert "🐎 Ride" in labels
+
+
+def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_profile_view(owner_user_id=101)
+
+    intruder_response = _FakeInteractionResponse()
+    intruder_interaction = _FakeInteraction()
+    intruder_interaction.response = intruder_response
+    intruder_interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
+    intruder_interaction.guild = None
+
+    asyncio.run(view._guard(intruder_interaction))  # type: ignore[arg-type]
+    assert len(intruder_response.calls) == 1
+    assert intruder_response.calls[0]["ephemeral"] is True
 
 
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
@@ -298,7 +325,11 @@ def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> No
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
     assert all(btn.disabled for btn in buttons)
     assert len(owner_response.calls) == 1
-    assert "B" in owner_response.calls[0]["content"]
+    call = owner_response.calls[0]
+    # content is None because the response carries an embed
+    assert call["content"] is None
+    assert isinstance(call["embed"], discord.Embed)
+    assert call["embed"].title == "Candidate Locked In"
 
 
 def test_candidate_view_on_timeout_disables_all_buttons(tmp_path) -> None:
