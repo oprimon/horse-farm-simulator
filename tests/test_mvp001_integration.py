@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import (
+from pferdehof_bot.services.lifecycle import (
     choose_candidate_flow,
     greet_horse_flow,
     horse_profile_flow,

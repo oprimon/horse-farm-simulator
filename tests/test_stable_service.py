@@ -6,21 +6,7 @@ import random
 import json
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import (
-    admin_rename_horse_flow,
-    choose_candidate_flow,
-    feed_horse_flow,
-    greet_horse_flow,
-    groom_horse_flow,
-    horse_profile_flow,
-    name_horse_flow,
-    rest_horse_flow,
-    ride_horse_flow,
-    stable_roster_flow,
-    start_onboarding_flow,
-    train_horse_flow,
-    view_candidates_flow,
-)
+from pferdehof_bot.services.stable import stable_roster_flow
 def test_stable_roster_flow_handles_empty_guild(tmp_path) -> None:
     repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
 
