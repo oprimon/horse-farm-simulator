@@ -977,20 +977,9 @@ def horse_profile_flow(
             title=f"{horse_name} - Horse Profile",
             description=f"{appearance}\nVisible traits: {traits_text}",
             accent="info",
-            fields=(
-                PresentationField(name="Mood", value=state_presentation.readiness_feel),
-                PresentationField(name="Bond", value=state_presentation.bond_feel, inline=True),
-                PresentationField(name="Energy", value=state_presentation.energy_feel, inline=True),
-                PresentationField(name="Confidence", value=state_presentation.confidence_feel, inline=True),
-                PresentationField(name="Skill", value=state_presentation.skill_feel, inline=True),
-                PresentationField(
-                    name="Recent Activity",
-                    value=(
-                        state_presentation.recent_activity_text
-                        if state_presentation.recent_activity_text is not None
-                        else "Nothing recent yet - try a cozy interaction like `/greet`."
-                    ),
-                ),
+            fields=tuple(
+                PresentationField(name=f.name, value=f.value, inline=f.inline)
+                for f in state_presentation.embed_fields
             ),
         ),
     )
@@ -1616,7 +1605,7 @@ def ride_horse_flow(
         presentation=_build_presentation(
             title="Ride Complete",
             description=outcome.story_text,
-            accent="success" if outcome.category in {"excellent", "good"} else "warning",
+            accent=outcome.accent,
             fields=(
                 PresentationField(name="Ride Notes", value=contextual_story),
                 PresentationField(

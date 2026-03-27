@@ -118,6 +118,7 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     )
     assert feed_result.has_adopted_horse is True
     assert feed_result.energy_gain == 6
+    assert feed_result.presentation is not None
 
     groom_result = groom_horse_flow(
         repository=repository,
@@ -148,6 +149,8 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     assert train_result.confidence_gain == 4
     assert train_result.energy_cost == 3
     assert train_result.health_loss == 0
+    assert train_result.presentation is not None
+    assert "Training Session" in train_result.presentation.title
 
     ride_d100_rolls = iter([99, 5])
     ride_d10_rolls = iter([6, 2, 3, 4])
@@ -167,6 +170,9 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     assert ride_result.ride_stat_gain == 6
     assert ride_result.energy_loss == 9
     assert ride_result.health_loss == 0
+    assert ride_result.presentation is not None
+    assert ride_result.presentation.title == "Ride Complete"
+    assert ride_result.presentation.accent in {"success", "warning"}
 
     profile_result = horse_profile_flow(
         repository=repository,
@@ -177,6 +183,9 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     assert profile_result.has_adopted_horse is True
     assert "Name: Luna" in profile_result.message
     assert ride_result.outcome.recent_activity_text in profile_result.message
+    assert profile_result.presentation is not None
+    assert "Luna" in profile_result.presentation.title
+    assert len(profile_result.presentation.fields) == 6
 
     stable_result = stable_roster_flow(
         repository=repository,
@@ -185,6 +194,8 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
         owner_display_name_resolver=lambda owner_id: {5101: "Mia", 5102: "Rowan"}.get(owner_id),
     )
     assert stable_result.is_empty is False
+    assert stable_result.presentation is not None
+    assert stable_result.presentation.title == "Server Stable Roster"
     assert stable_result.rows == [
         {
             "horse_id": 1,

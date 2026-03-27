@@ -7,6 +7,15 @@ from typing import Any, Mapping
 
 
 @dataclass(frozen=True)
+class StateEmbedField:
+    """A single Discord-agnostic embed field fragment for rendering."""
+
+    name: str
+    value: str
+    inline: bool = False
+
+
+@dataclass(frozen=True)
 class HorseStatePresentation:
     """Human-readable state labels derived from internal horse progression values."""
 
@@ -16,6 +25,25 @@ class HorseStatePresentation:
     confidence_feel: str
     skill_feel: str
     recent_activity_text: str | None
+
+    @property
+    def embed_fields(self) -> tuple[StateEmbedField, ...]:
+        """Structured field fragments ready for embed rendering."""
+        return (
+            StateEmbedField(name="Mood", value=self.readiness_feel),
+            StateEmbedField(name="Bond", value=self.bond_feel, inline=True),
+            StateEmbedField(name="Energy", value=self.energy_feel, inline=True),
+            StateEmbedField(name="Confidence", value=self.confidence_feel, inline=True),
+            StateEmbedField(name="Skill", value=self.skill_feel, inline=True),
+            StateEmbedField(
+                name="Recent Activity",
+                value=(
+                    self.recent_activity_text
+                    if self.recent_activity_text is not None
+                    else "Nothing recent yet - try a cozy interaction like `/greet`."
+                ),
+            ),
+        )
 
 
 def build_horse_state_presentation(horse: Mapping[str, Any]) -> HorseStatePresentation:

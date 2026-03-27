@@ -34,6 +34,14 @@ class RideOutcomeEntry:
     """Short summary that goes into the horse's recent-activity slot.  Use ``{horse_name}``."""
 
 
+_CATEGORY_ACCENTS: dict[str, str] = {
+    "excellent": "success",
+    "good": "success",
+    "fair": "warning",
+    "setback": "warning",
+}
+
+
 @dataclass(frozen=True)
 class RideOutcomeResult:
     """Result of a ride outcome selection, ready to be rendered and persisted."""
@@ -42,6 +50,7 @@ class RideOutcomeResult:
     category: str
     story_text: str
     recent_activity_text: str
+    accent: str = "info"
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +353,7 @@ def select_ride_outcome(
         category=chosen_category,
         story_text=entry.story_text.format(horse_name=horse_name),
         recent_activity_text=entry.recent_activity_text.format(horse_name=horse_name),
+        accent=_CATEGORY_ACCENTS.get(chosen_category, "info"),
     )
 
 

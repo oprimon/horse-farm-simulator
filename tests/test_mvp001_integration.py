@@ -51,6 +51,8 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert start_result.already_adopted is False
     assert "/horse view" in start_result.message
+    assert start_result.presentation is not None
+    assert start_result.presentation.title == "Welcome To Pferdehof"
 
     view_result = view_candidates_flow(
         repository=repository,
@@ -60,6 +62,9 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert view_result.has_active_session is True
     assert "A: Chestnut with bright blaze" in view_result.message
+    assert view_result.presentation is not None
+    assert view_result.presentation.title == "Your Horse Candidates"
+    assert len(view_result.presentation.fields) == 3
 
     choose_result = choose_candidate_flow(
         repository=repository,
@@ -70,6 +75,8 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert choose_result.selection_locked is True
     assert choose_result.selected_candidate_id == "A"
+    assert choose_result.presentation is not None
+    assert choose_result.presentation.title == "Candidate Locked In"
 
     name_result = name_horse_flow(
         repository=repository,
@@ -80,6 +87,8 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert name_result.finalized is True
     assert "Luna is officially your horse now" in name_result.message
+    assert name_result.presentation is not None
+    assert "Luna" in name_result.presentation.title
 
     horse_result = horse_profile_flow(
         repository=repository,
@@ -89,6 +98,9 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert horse_result.has_adopted_horse is True
     assert "Name: Luna" in horse_result.message
+    assert horse_result.presentation is not None
+    assert "Luna" in horse_result.presentation.title
+    assert len(horse_result.presentation.fields) == 6
 
     greet_result = greet_horse_flow(
         repository=repository,
@@ -98,6 +110,7 @@ def test_mvp001_happy_path_full_onboarding_to_first_interaction(tmp_path) -> Non
     )
     assert greet_result.has_adopted_horse is True
     assert "You greet Luna softly" in greet_result.message
+    assert greet_result.presentation is not None
 
     persisted = repository.get_player(user_id=4001, guild_id=5001)
     assert persisted is not None

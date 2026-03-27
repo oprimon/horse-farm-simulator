@@ -31,7 +31,7 @@ from .onboarding import (
 	view_candidates_flow,
 )
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
-from .state_presentation import HorseStatePresentation, build_horse_state_presentation
+from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
 from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
 
 __all__ = [
@@ -71,6 +71,7 @@ __all__ = [
 	"compute_readiness_score",
 	"select_ride_outcome",
 	"HorseStatePresentation",
+	"StateEmbedField",
 	"build_horse_state_presentation",
 	"FileTelemetryLogger",
 	"TelemetryEvent",
