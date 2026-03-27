@@ -177,10 +177,10 @@ class CoreCog(commands.Cog):
 
         view = ProfileActionView()
         actions: list[tuple[str, str, object, discord.ButtonStyle]] = [
-            ("🌾 Feed",  "feed",  feed_horse_flow,  discord.ButtonStyle.success),
-            ("🪮 Groom", "groom", groom_horse_flow, discord.ButtonStyle.success),
+            ("🌾 Feed",  "feed",  feed_horse_flow,  discord.ButtonStyle.primary),
+            ("🪮 Groom", "groom", groom_horse_flow, discord.ButtonStyle.primary),
             ("😴 Rest",  "rest",  rest_horse_flow,  discord.ButtonStyle.primary),
-            ("🎓 Train", "train", train_horse_flow, discord.ButtonStyle.primary),
+            ("🎓 Train", "train", train_horse_flow, discord.ButtonStyle.danger),
             ("🐎 Ride",  "ride",  ride_horse_flow,  discord.ButtonStyle.danger),
         ]
         for label, cmd_id, flow_fn, style in actions:
@@ -201,6 +201,180 @@ class CoreCog(commands.Cog):
 
         return view
 
+    def _build_recovery_view(self, *, owner_user_id: int) -> discord.ui.View:
+        """Build feed/rest quick actions for deferred train/ride states."""
+        cog = self
+
+        class RecoveryActionView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+            async def _guard(self, interaction: discord.Interaction) -> bool:
+                if interaction.user.id != owner_user_id:
+                    await interaction.response.send_message(
+                        "Only the horse's owner can use these actions.",
+                        ephemeral=True,
+                    )
+                    return False
+                return True
+
+            async def _run(self, interaction: discord.Interaction, flow_fn, command_id: str) -> None:
+                if not await self._guard(interaction):
+                    return
+                guild_id = interaction.guild.id if interaction.guild is not None else None
+                display_name = getattr(interaction.user, "display_name", interaction.user.name)
+                result = flow_fn(
+                    repository=cog._repository,
+                    user_id=interaction.user.id,
+                    guild_id=guild_id,
+                    display_name=display_name,
+                    telemetry_logger=cog._telemetry_logger,
+                )
+                await cog._send_response(
+                    interaction=interaction,
+                    command_id=command_id,
+                    message=result.message,
+                    presentation=result.presentation,
+                )
+
+        view = RecoveryActionView()
+        actions: list[tuple[str, str, object]] = [
+            ("🌾 Feed", "feed", feed_horse_flow),
+            ("😴 Rest", "rest", rest_horse_flow),
+        ]
+        for label, cmd_id, flow_fn in actions:
+            async def _callback(
+                interaction: discord.Interaction,
+                _flow=flow_fn,
+                _cmd=cmd_id,
+            ) -> None:
+                await view._run(interaction, _flow, _cmd)
+
+            button = discord.ui.Button(
+                label=label,
+                style=discord.ButtonStyle.primary,
+                custom_id=f"recovery_{cmd_id}",
+            )
+            button.callback = _callback
+            view.add_item(button)
+
+        return view
+
+    def _build_ride_view(self, *, owner_user_id: int) -> discord.ui.View:
+        """Build a single quick-action Ride button."""
+        cog = self
+
+        class RideActionView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+            async def _guard(self, interaction: discord.Interaction) -> bool:
+                if interaction.user.id != owner_user_id:
+                    await interaction.response.send_message(
+                        "Only the horse's owner can use this action.",
+                        ephemeral=True,
+                    )
+                    return False
+                return True
+
+            async def _run(self, interaction: discord.Interaction) -> None:
+                if not await self._guard(interaction):
+                    return
+                guild_id = interaction.guild.id if interaction.guild is not None else None
+                display_name = getattr(interaction.user, "display_name", interaction.user.name)
+                result = ride_horse_flow(
+                    repository=cog._repository,
+                    user_id=interaction.user.id,
+                    guild_id=guild_id,
+                    display_name=display_name,
+                    telemetry_logger=cog._telemetry_logger,
+                )
+                followup_view = (
+                    cog._build_recovery_view(owner_user_id=interaction.user.id)
+                    if result.has_adopted_horse and result.blocked_by_readiness
+                    else None
+                )
+                await cog._send_response(
+                    interaction=interaction,
+                    command_id="ride",
+                    message=result.message,
+                    presentation=result.presentation,
+                    view=followup_view,
+                )
+
+        view = RideActionView()
+
+        async def _callback(interaction: discord.Interaction) -> None:
+            await view._run(interaction)
+
+        button = discord.ui.Button(
+            label="🐎 Ride",
+            style=discord.ButtonStyle.danger,
+            custom_id="quick_ride",
+        )
+        button.callback = _callback
+        view.add_item(button)
+        return view
+
+    def _build_stable_view(self) -> discord.ui.View:
+        """Build stable-level quick actions."""
+        cog = self
+
+        class StableView(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=300)
+
+        view = StableView()
+
+        async def _profile_callback(interaction: discord.Interaction) -> None:
+            await cog._respond_with_profile(interaction)
+
+        profile_button = discord.ui.Button(
+            label="🐎 Profile",
+            style=discord.ButtonStyle.primary,
+            custom_id="stable_profile",
+        )
+        profile_button.callback = _profile_callback
+        view.add_item(profile_button)
+        return view
+
+    def _can_ride_from_player(self, player: dict[str, object] | None) -> bool:
+        """Return whether a player's horse currently meets ride safety constraints."""
+        if player is None or not bool(player.get("adopted", False)):
+            return False
+        horse = player.get("horse")
+        if not isinstance(horse, dict):
+            return False
+        try:
+            energy = int(horse.get("energy") or 0)
+            health = int(horse.get("health") or 0)
+        except (TypeError, ValueError):
+            return False
+        return energy >= 30 and health >= 10
+
+    async def _respond_with_profile(self, interaction: discord.Interaction) -> None:
+        """Render `/horse profile` response for slash command and profile button flows."""
+        guild_id = interaction.guild.id if interaction.guild is not None else None
+        display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        result = horse_profile_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            guild_id=guild_id,
+            display_name=display_name,
+        )
+        profile_view = (
+            self._build_profile_view(owner_user_id=interaction.user.id)
+            if result.has_adopted_horse
+            else None
+        )
+        await self._send_response(
+            interaction=interaction,
+            command_id="horse.profile",
+            message=result.message,
+            presentation=result.presentation,
+            view=profile_view,
+        )
+
     async def _send_response(
         self,
         interaction: discord.Interaction,
@@ -215,13 +389,16 @@ class CoreCog(commands.Cog):
         embed = self._build_embed(presentation) if presentation is not None else None
         # When an embed is present, suppress the plain-text content so Discord
         # does not render both the text and the card side-by-side.
-        content: str | None = None if embed is not None else message
-        kwargs: dict[str, object] = {"ephemeral": is_ephemeral}
+        if embed is not None and view is not None:
+            await interaction.response.send_message(None, embed=embed, view=view, ephemeral=is_ephemeral)
+            return
         if embed is not None:
-            kwargs["embed"] = embed
+            await interaction.response.send_message(None, embed=embed, ephemeral=is_ephemeral)
+            return
         if view is not None:
-            kwargs["view"] = view
-        await interaction.response.send_message(content, **kwargs)
+            await interaction.response.send_message(message, view=view, ephemeral=is_ephemeral)
+            return
+        await interaction.response.send_message(message, ephemeral=is_ephemeral)
 
     async def _build_owner_display_name_map(
         self,
@@ -273,26 +450,7 @@ class CoreCog(commands.Cog):
     @horse_group.command(name="profile", description="Show your current horse profile")
     async def horse_profile(self, interaction: discord.Interaction) -> None:
         """Horse command group for onboarding and horse profile actions."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
-        result = horse_profile_flow(
-            repository=self._repository,
-            user_id=interaction.user.id,
-            guild_id=guild_id,
-            display_name=display_name,
-        )
-        profile_view = (
-            self._build_profile_view(owner_user_id=interaction.user.id)
-            if result.has_adopted_horse
-            else None
-        )
-        await self._send_response(
-            interaction=interaction,
-            command_id="horse.profile",
-            message=result.message,
-            presentation=result.presentation,
-            view=profile_view,
-        )
+        await self._respond_with_profile(interaction)
 
     @horse_group.command(name="view", description="Show current horse candidates")
     async def horse_view(self, interaction: discord.Interaction) -> None:
@@ -416,11 +574,13 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        ride_view = self._build_ride_view(owner_user_id=interaction.user.id) if self._can_ride_from_player(result.player) else None
         await self._send_response(
             interaction=interaction,
             command_id="feed",
             message=result.message,
             presentation=result.presentation,
+            view=ride_view,
         )
 
     @app_commands.command(name="groom", description="Groom your adopted horse to nurture bond and calmness")
@@ -435,11 +595,13 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        ride_view = self._build_ride_view(owner_user_id=interaction.user.id) if self._can_ride_from_player(result.player) else None
         await self._send_response(
             interaction=interaction,
             command_id="groom",
             message=result.message,
             presentation=result.presentation,
+            view=ride_view,
         )
 
     @app_commands.command(name="rest", description="Let your adopted horse rest and recover health")
@@ -473,11 +635,17 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        action_view = None
+        if result.has_adopted_horse and result.blocked_by_readiness:
+            action_view = self._build_recovery_view(owner_user_id=interaction.user.id)
+        elif self._can_ride_from_player(result.player):
+            action_view = self._build_ride_view(owner_user_id=interaction.user.id)
         await self._send_response(
             interaction=interaction,
             command_id="train",
             message=result.message,
             presentation=result.presentation,
+            view=action_view,
         )
 
     @app_commands.command(name="ride", description="Take your adopted horse on a short ride")
@@ -492,11 +660,17 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        action_view = (
+            self._build_recovery_view(owner_user_id=interaction.user.id)
+            if result.has_adopted_horse and result.blocked_by_readiness
+            else None
+        )
         await self._send_response(
             interaction=interaction,
             command_id="ride",
             message=result.message,
             presentation=result.presentation,
+            view=action_view,
         )
 
     @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
@@ -528,11 +702,13 @@ class CoreCog(commands.Cog):
             telemetry_logger=self._telemetry_logger,
             user_id=interaction.user.id,
         )
+        stable_view = self._build_stable_view() if result.has_guild_context else None
         await self._send_response(
             interaction=interaction,
             command_id="stable",
             message=result.message,
             presentation=result.presentation,
+            view=stable_view,
         )
 
 

@@ -240,6 +240,44 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     assert intruder_response.calls[0]["ephemeral"] is True
 
 
+def test_build_recovery_view_has_feed_and_rest_buttons(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_recovery_view(owner_user_id=101)
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 2
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🌾 Feed", "😴 Rest"]
+
+
+def test_build_stable_view_has_profile_button(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_stable_view()
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 1
+    assert buttons[0].label == "🐎 Profile"
+
+
+def test_build_ride_view_has_single_ride_button(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    view = core_cog._build_ride_view(owner_user_id=101)
+
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 1
+    assert buttons[0].label == "🐎 Ride"
+
+
+def test_can_ride_from_player_applies_energy_and_health_constraints(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+
+    assert core_cog._can_ride_from_player(None) is False
+    assert core_cog._can_ride_from_player({"adopted": False}) is False
+    assert core_cog._can_ride_from_player({"adopted": True, "horse": {"energy": 29, "health": 10}}) is False
+    assert core_cog._can_ride_from_player({"adopted": True, "horse": {"energy": 30, "health": 9}}) is False
+    assert core_cog._can_ride_from_player({"adopted": True, "horse": {"energy": 30, "health": 10}}) is True
+
+
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     candidates = [
