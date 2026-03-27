@@ -123,6 +123,42 @@ class RideHorseResult:
     presentation: ResponsePresentation | None = None
 
 
+def can_ride_player(player: PlayerRecord | None) -> bool:
+    """Return whether a player's horse currently meets ride safety constraints."""
+    if player is None or not bool(player.get("adopted", False)):
+        return False
+
+    horse = player.get("horse")
+    if not isinstance(horse, dict):
+        return False
+
+    try:
+        energy = int(horse.get("energy") or 0)
+        health = int(horse.get("health") or 0)
+    except (TypeError, ValueError):
+        return False
+
+    return energy >= 30 and health >= 10
+
+
+def can_train_player(player: PlayerRecord | None) -> bool:
+    """Return whether a player's horse currently meets training readiness constraints."""
+    if player is None or not bool(player.get("adopted", False)):
+        return False
+
+    horse = player.get("horse")
+    if not isinstance(horse, dict):
+        return False
+
+    try:
+        energy = int(horse.get("energy") or 0)
+        health = int(horse.get("health") or 0)
+    except (TypeError, ValueError):
+        return False
+
+    return energy >= 10 and health >= 10
+
+
 def _build_presentation(
     *,
     title: str,

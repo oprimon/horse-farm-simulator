@@ -2,10 +2,11 @@
 
 ## Current Snapshot
 - Branch: `dev`
-- Current `HEAD`: `a6a4233`
+- Current `HEAD`: `e757c3a`
 - Working tree status now:
   - modified: `src/pferdehof_bot/cogs/core.py`
-  - untracked: `src/pferdehof_bot/cogs/shared/`
+  - modified: `src/pferdehof_bot/services/progression.py`
+  - modified: `REFACTOR-HANDOFF-PLAN.md`
 - Active shown problems now:
   - none (latest diagnostics check clean).
 
@@ -52,7 +53,14 @@
 ### Phase 4: Readiness policy extraction
 - Scope:
   - move train/ride readiness checks out of cog and into service-layer policy helpers.
-- Status: pending
+- Status: **completed (ready to commit)**
+- Completed in workspace:
+  - Added `can_train_player` and `can_ride_player` to `src/pferdehof_bot/services/progression.py`.
+  - Updated `src/pferdehof_bot/cogs/core.py` readiness methods to delegate to progression helpers.
+- Verification:
+  - diagnostics: clean for edited files.
+  - targeted tests: `47 passed`.
+  - full suite: `166 passed`.
 
 ### Phase 5: Multi-cog split
 - Scope:
@@ -84,8 +92,11 @@
 - 2026-03-28: Committed and pushed Phase 1 as `a6a4233` on `dev`.
 - 2026-03-28: Extracted shared transport helpers (`context.py`, `responder.py`) and wired `core.py` to use them.
 - 2026-03-28: Post-extraction validation complete: targeted (`37 passed`) and full suite (`166 passed`) green.
+- 2026-03-28: Committed and pushed Phase 2 as `e757c3a` on `dev`.
+- 2026-03-28: Extracted readiness policy helpers into progression service and switched `core.py` to delegate.
+- 2026-03-28: Readiness extraction validation complete: targeted (`47 passed`) and full suite (`166 passed`) green.
 
 ## Next Actions
-1. Commit and push Phase 2 extraction changes.
+1. Commit and push Phase 4 readiness extraction changes.
 2. Start Phase 3 by extracting inline view classes from `core.py` into view modules.
-3. Run targeted tests after each view family migration, then full pytest before commit.
+3. Run targeted tests after each view family migration, then full pytest before each commit.

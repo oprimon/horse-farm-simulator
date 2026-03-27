@@ -21,7 +21,7 @@ from pferdehof_bot.services.lifecycle import (
     view_candidates_flow,
 )
 from pferdehof_bot.services.presentation_models import ResponsePresentation
-from pferdehof_bot.services.progression import ride_horse_flow, train_horse_flow
+from pferdehof_bot.services.progression import can_ride_player, can_train_player, ride_horse_flow, train_horse_flow
 from pferdehof_bot.services.stable import stable_roster_flow
 from pferdehof_bot.services.telemetry import FileTelemetryLogger
 
@@ -424,31 +424,11 @@ class CoreCog(commands.Cog):
 
     def _can_ride_from_player(self, player: dict[str, object] | None) -> bool:
         """Return whether a player's horse currently meets ride safety constraints."""
-        if player is None or not bool(player.get("adopted", False)):
-            return False
-        horse = player.get("horse")
-        if not isinstance(horse, dict):
-            return False
-        try:
-            energy = int(horse.get("energy") or 0)
-            health = int(horse.get("health") or 0)
-        except (TypeError, ValueError):
-            return False
-        return energy >= 30 and health >= 10
+        return can_ride_player(player)
 
     def _can_train_from_player(self, player: dict[str, object] | None) -> bool:
         """Return whether a player's horse currently meets training readiness constraints."""
-        if player is None or not bool(player.get("adopted", False)):
-            return False
-        horse = player.get("horse")
-        if not isinstance(horse, dict):
-            return False
-        try:
-            energy = int(horse.get("energy") or 0)
-            health = int(horse.get("health") or 0)
-        except (TypeError, ValueError):
-            return False
-        return energy >= 10 and health >= 10
+        return can_train_player(player)
 
     def _build_followup_view(
         self,
