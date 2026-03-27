@@ -12,7 +12,6 @@ from .onboarding import (
 	RideHorseResult,
 	StableRosterResult,
 	StartOnboardingResult,
-	TrainHorseResult,
 	ViewCandidatesResult,
 	admin_rename_horse_flow,
 	choose_candidate_flow,
@@ -22,9 +21,9 @@ from .onboarding import (
 	ride_horse_flow,
 	stable_roster_flow,
 	start_onboarding_flow,
-	train_horse_flow,
 	view_candidates_flow,
 )
+from .progression import TrainHorseResult, train_horse_flow
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
 from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
 from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
