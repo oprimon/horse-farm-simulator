@@ -9,7 +9,6 @@ from .onboarding import (
 	GreetHorseResult,
 	HorseProfileResult,
 	NameHorseResult,
-	StableRosterResult,
 	StartOnboardingResult,
 	ViewCandidatesResult,
 	admin_rename_horse_flow,
@@ -17,12 +16,12 @@ from .onboarding import (
 	greet_horse_flow,
 	horse_profile_flow,
 	name_horse_flow,
-	stable_roster_flow,
 	start_onboarding_flow,
 	view_candidates_flow,
 )
 from .progression import RideHorseResult, TrainHorseResult, ride_horse_flow, train_horse_flow
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
+from .stable import StableRosterResult, stable_roster_flow
 from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
 from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
 
