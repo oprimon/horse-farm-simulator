@@ -168,11 +168,17 @@ class CoreCog(commands.Cog):
                     display_name=display_name,
                     telemetry_logger=cog._telemetry_logger,
                 )
+                followup_view = cog._build_followup_view(
+                    command_id=command_id,
+                    result=result,
+                    owner_user_id=interaction.user.id,
+                )
                 await cog._send_response(
                     interaction=interaction,
                     command_id=command_id,
                     message=result.message,
                     presentation=result.presentation,
+                    view=followup_view,
                 )
 
         view = ProfileActionView()
@@ -230,11 +236,17 @@ class CoreCog(commands.Cog):
                     display_name=display_name,
                     telemetry_logger=cog._telemetry_logger,
                 )
+                followup_view = cog._build_followup_view(
+                    command_id=command_id,
+                    result=result,
+                    owner_user_id=interaction.user.id,
+                )
                 await cog._send_response(
                     interaction=interaction,
                     command_id=command_id,
                     message=result.message,
                     presentation=result.presentation,
+                    view=followup_view,
                 )
 
         view = RecoveryActionView()
@@ -289,10 +301,10 @@ class CoreCog(commands.Cog):
                     display_name=display_name,
                     telemetry_logger=cog._telemetry_logger,
                 )
-                followup_view = (
-                    cog._build_recovery_view(owner_user_id=interaction.user.id)
-                    if result.has_adopted_horse and result.blocked_by_readiness
-                    else None
+                followup_view = cog._build_followup_view(
+                    command_id="ride",
+                    result=result,
+                    owner_user_id=interaction.user.id,
                 )
                 await cog._send_response(
                     interaction=interaction,
@@ -351,6 +363,31 @@ class CoreCog(commands.Cog):
         except (TypeError, ValueError):
             return False
         return energy >= 30 and health >= 10
+
+    def _build_followup_view(
+        self,
+        *,
+        command_id: str,
+        result: object,
+        owner_user_id: int,
+    ) -> discord.ui.View | None:
+        """Build context-sensitive follow-up action views for command results."""
+        has_adopted_horse = bool(getattr(result, "has_adopted_horse", False))
+        blocked_by_readiness = bool(getattr(result, "blocked_by_readiness", False))
+        player = getattr(result, "player", None)
+
+        if command_id in {"feed", "groom"}:
+            return self._build_ride_view(owner_user_id=owner_user_id) if self._can_ride_from_player(player) else None
+
+        if command_id == "train":
+            if has_adopted_horse and blocked_by_readiness:
+                return self._build_recovery_view(owner_user_id=owner_user_id)
+            return self._build_ride_view(owner_user_id=owner_user_id) if self._can_ride_from_player(player) else None
+
+        if command_id == "ride":
+            return self._build_recovery_view(owner_user_id=owner_user_id) if has_adopted_horse and blocked_by_readiness else None
+
+        return None
 
     async def _respond_with_profile(self, interaction: discord.Interaction) -> None:
         """Render `/horse profile` response for slash command and profile button flows."""
@@ -574,7 +611,11 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        ride_view = self._build_ride_view(owner_user_id=interaction.user.id) if self._can_ride_from_player(result.player) else None
+        ride_view = self._build_followup_view(
+            command_id="feed",
+            result=result,
+            owner_user_id=interaction.user.id,
+        )
         await self._send_response(
             interaction=interaction,
             command_id="feed",
@@ -595,7 +636,11 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        ride_view = self._build_ride_view(owner_user_id=interaction.user.id) if self._can_ride_from_player(result.player) else None
+        ride_view = self._build_followup_view(
+            command_id="groom",
+            result=result,
+            owner_user_id=interaction.user.id,
+        )
         await self._send_response(
             interaction=interaction,
             command_id="groom",
@@ -635,11 +680,11 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        action_view = None
-        if result.has_adopted_horse and result.blocked_by_readiness:
-            action_view = self._build_recovery_view(owner_user_id=interaction.user.id)
-        elif self._can_ride_from_player(result.player):
-            action_view = self._build_ride_view(owner_user_id=interaction.user.id)
+        action_view = self._build_followup_view(
+            command_id="train",
+            result=result,
+            owner_user_id=interaction.user.id,
+        )
         await self._send_response(
             interaction=interaction,
             command_id="train",
@@ -660,10 +705,10 @@ class CoreCog(commands.Cog):
             display_name=display_name,
             telemetry_logger=self._telemetry_logger,
         )
-        action_view = (
-            self._build_recovery_view(owner_user_id=interaction.user.id)
-            if result.has_adopted_horse and result.blocked_by_readiness
-            else None
+        action_view = self._build_followup_view(
+            command_id="ride",
+            result=result,
+            owner_user_id=interaction.user.id,
         )
         await self._send_response(
             interaction=interaction,

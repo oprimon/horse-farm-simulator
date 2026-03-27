@@ -278,6 +278,54 @@ def test_can_ride_from_player_applies_energy_and_health_constraints(tmp_path) ->
     assert core_cog._can_ride_from_player({"adopted": True, "horse": {"energy": 30, "health": 10}}) is True
 
 
+def test_build_followup_view_returns_ride_for_feed_when_ready(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        has_adopted_horse=True,
+        blocked_by_readiness=False,
+        player={"adopted": True, "horse": {"energy": 30, "health": 10}},
+    )
+
+    view = core_cog._build_followup_view(command_id="feed", result=result, owner_user_id=101)
+
+    assert view is not None
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    assert len(buttons) == 1
+    assert buttons[0].label == "🐎 Ride"
+
+
+def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        has_adopted_horse=True,
+        blocked_by_readiness=True,
+        player={"adopted": True, "horse": {"energy": 10, "health": 10}},
+    )
+
+    view = core_cog._build_followup_view(command_id="train", result=result, owner_user_id=101)
+
+    assert view is not None
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🌾 Feed", "😴 Rest"]
+
+
+def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        has_adopted_horse=True,
+        blocked_by_readiness=True,
+        player={"adopted": True, "horse": {"energy": 10, "health": 10}},
+    )
+
+    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+
+    assert view is not None
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🌾 Feed", "😴 Rest"]
+
+
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     candidates = [
