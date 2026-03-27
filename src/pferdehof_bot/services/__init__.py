@@ -2,8 +2,7 @@
 
 from .candidate_generator import generate_candidate_horses
 from .care import FeedHorseResult, GroomHorseResult, RestHorseResult, feed_horse_flow, groom_horse_flow, rest_horse_flow
-from .moderation import BLOCKED_NAME_TERMS, contains_blocked_name_term, validate_horse_name
-from .onboarding import (
+from .lifecycle import (
 	AdminRenameHorseResult,
 	ChooseCandidateResult,
 	GreetHorseResult,
@@ -19,6 +18,7 @@ from .onboarding import (
 	start_onboarding_flow,
 	view_candidates_flow,
 )
+from .moderation import BLOCKED_NAME_TERMS, contains_blocked_name_term, validate_horse_name
 from .progression import RideHorseResult, TrainHorseResult, ride_horse_flow, train_horse_flow
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
 from .stable import StableRosterResult, stable_roster_flow
