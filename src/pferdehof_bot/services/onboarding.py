@@ -1477,10 +1477,11 @@ def ride_horse_flow(
     # - Health can decrease by up to 10 (1d10), so require at least 10.
     if current_energy < 30 or current_health < 10:
         state_presentation = build_horse_state_presentation(horse)
+        recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/ride`."
         message = (
             f"You decide not to ride {horse_name} right now. "
             f"{horse_name} feels {state_presentation.readiness_feel}, and a safe ride needs at least 30 energy and 10 health. "
-            "Try `/feed` or `/rest` first, then come back to `/ride`."
+            f"Recovery Tip: {recovery_guidance}"
         )
         return RideHorseResult(
             player=player,
@@ -1494,8 +1495,14 @@ def ride_horse_flow(
             health_loss=0,
             presentation=_build_presentation(
                 title="Ride Deferred",
-                description=message,
+                description=(
+                    f"You decide not to ride {horse_name} right now. "
+                    f"{horse_name} feels {state_presentation.readiness_feel}, and a safe ride needs at least 30 energy and 10 health."
+                ),
                 accent="warning",
+                fields=(
+                    PresentationField(name="Recovery Tip", value=recovery_guidance),
+                ),
             ),
         )
 
