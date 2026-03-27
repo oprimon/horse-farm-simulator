@@ -2,63 +2,74 @@
 
 ## Current Snapshot
 - Branch: `dev`
-- Current `HEAD`: `340e625` (`docs(readme): add service architecture boundaries note`)
-- `origin/dev`: `9b6d1a2` (`chore(release): bump version to 0.5.0`)
-- Working tree status now:
-  - modified: `tests/test_core_cog_slash.py` (static-type diagnostics cleanup, not committed yet)
-  - untracked: `REFACTOR-HANDOFF-PLAN.md`
-- Latest full pytest run: `166 passed`
+- Current `HEAD`: `49c8411`
+- Working tree status at start of this run:
+  - modified: `REFACTOR-HANDOFF-PLAN.md`
+- Active shown problem at start:
+  - `src/pferdehof_bot/bot.py`: assignment to `intents.message_content` flagged by static checker.
 
-## Refactor Work Completed
+## Objectives For This Run
+1. Start implementation now with small, safe increments.
+2. Run tests frequently (targeted while editing, full suite before every commit).
+3. Remove all shown problems.
+4. Commit all completed changes to `dev`.
+5. Keep this file as a live tracker and update after each phase.
 
-### Service Modularization (Historical)
-- Phase A: shared mechanics extracted to `src/pferdehof_bot/services/flow_utils.py`.
-- Phase B: care flows extracted to `src/pferdehof_bot/services/care.py`.
-- Phase C: training + ride flows extracted to `src/pferdehof_bot/services/progression.py`.
-- Phase C2: migrated care/progression code removed from `src/pferdehof_bot/services/onboarding.py`.
-- Phase D: stable roster flow extracted to `src/pferdehof_bot/services/stable.py`.
-- Phase E: onboarding lifecycle flows extracted to `src/pferdehof_bot/services/lifecycle.py`.
+## Implementation Phases
 
-### Refactor Plan R1-R4 (Completed in this session)
-1. `c1bd950` refactor(services): use concrete module imports in core cog
-2. `d8d1f4d` refactor(services): move response models to presentation module
-3. `b346d11` refactor(tests): import services from concrete modules
-4. `340e625` docs(readme): add service architecture boundaries note
+### Phase 1: Baseline + diagnostics cleanup
+- Scope:
+  - fix active typing problem in `src/pferdehof_bot/bot.py`.
+  - validate with full pytest.
+  - commit on `dev`.
+- Status: **in progress**
 
-### Structural Outcomes
-- Internal service imports in `core.py` now target concrete modules (`care/lifecycle/progression/stable/telemetry`) instead of broad package imports.
-- Shared presentation types now live in `src/pferdehof_bot/services/presentation_models.py`.
-- `src/pferdehof_bot/services/onboarding.py` is a compatibility re-export layer.
-- Tests in service/integration modules import concrete service modules directly.
-- README now documents service boundaries and responsibilities.
+### Phase 2: Shared transport extraction from core cog
+- Scope:
+  - extract response rendering and interaction context helpers.
+  - keep command behavior unchanged.
+- Status: pending
 
-## Post-Refactor Cleanup (In Progress)
+### Phase 3: View factory extraction
+- Scope:
+  - extract inline `discord.ui.View` classes from `core.py`.
+  - centralize owner-guard/dispatch logic.
+- Status: pending
 
-### Static diagnostics cleanup in `tests/test_core_cog_slash.py`
-Status: code changes applied locally, uncommitted.
+### Phase 4: Readiness policy extraction
+- Scope:
+  - move train/ride readiness checks out of cog and into service-layer policy helpers.
+- Status: pending
 
-What was fixed:
-- Added explicit typing helpers/casts for fake interaction and protocol-shaped test doubles.
-- Replaced raw `SimpleNamespace` response stubs for `discord.NotFound`/`discord.Forbidden` with a typed helper cast.
-- Added explicit candidate list annotations (`list[dict[str, object]]`) to satisfy invariance checks.
-- Resolved `"in"` operator type warning by string-coercing content assertions.
+### Phase 5: Multi-cog split
+- Scope:
+  - split `core.py` into onboarding/care/progression/stable cogs.
+  - update extension loading safely.
+- Status: pending
 
-Validation state:
-- File diagnostics: no errors in `tests/test_core_cog_slash.py`.
-- Runtime suite remains green (`166 passed`).
+### Phase 6: DI consolidation and hardening
+- Scope:
+  - inject shared dependencies at composition root.
+  - full regression verification.
+- Status: pending
 
-## Why pytest can pass while compile diagnostics fail
-- `pytest` executes runtime behavior and does not enforce static type analysis by default.
-- The reported issues were from static checking (type checker / language server), not runtime exceptions.
-- Result: tests can still pass even when the editor reports type incompatibilities.
+## Test Cadence (Mandatory)
+1. Run targeted tests after each focused edit cluster.
+2. Run full suite before each commit:
+   - `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q`
+3. Do not advance phase with failing tests.
 
-## Suggested Next Steps
-1. Commit `tests/test_core_cog_slash.py` static-type cleanup.
-2. Push `dev` branch so refactor commits and test-diagnostics fix are on remote.
-3. Optionally add a CI/static check step (e.g., pyright/mypy) so these issues fail earlier in automation.
+## Commit Cadence
+1. One commit per completed phase.
+2. Conventional, descriptive commit messages.
+3. Push `dev` after each completed phase commit.
 
-## Quick Start (Next Session)
-1. `git checkout dev`
-2. `git pull --ff-only origin dev`
-3. `d:/Creativity/coding/Discord/pferdehof-sim/.venv/Scripts/python.exe -m pytest -q`
-4. If static checks are enabled, run them before coding and before final commit.
+## Live Progress Log
+- 2026-03-28: Phase 1 started.
+- 2026-03-28: Removed `intents.message_content = False` in `src/pferdehof_bot/bot.py` to resolve static typing issue while preserving runtime behavior (`Intents.default()` already leaves message content intent disabled).
+- 2026-03-28: Next step: run diagnostics + full pytest, then commit Phase 1.
+
+## Next Actions
+1. Validate no shown problems remain.
+2. Run full pytest.
+3. Commit Phase 1 and update this document with commit hash and results.

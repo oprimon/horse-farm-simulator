@@ -79,7 +79,6 @@ def create_bot(
 ) -> commands.Bot:
     """Create a configured commands.Bot instance."""
     intents = discord.Intents.default()
-    intents.message_content = False
 
     bot = commands.Bot(command_prefix=command_prefix, intents=intents)
     sync_settings = command_sync_settings or CommandSyncSettings()
