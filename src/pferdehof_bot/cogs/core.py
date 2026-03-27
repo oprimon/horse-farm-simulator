@@ -151,7 +151,10 @@ class CoreCog(commands.Cog):
         metadata = get_command_metadata(command_id)
         is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
         embed = self._build_embed(presentation) if presentation is not None else None
-        await interaction.response.send_message(message, embed=embed, view=view, ephemeral=is_ephemeral)
+        kwargs: dict[str, object] = {"embed": embed, "ephemeral": is_ephemeral}
+        if view is not None:
+            kwargs["view"] = view
+        await interaction.response.send_message(message, **kwargs)
 
     async def _build_owner_display_name_map(
         self,
