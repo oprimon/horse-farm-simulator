@@ -436,7 +436,7 @@ class CoreCog(commands.Cog):
             health = int(horse.get("health") or 0)
         except (TypeError, ValueError):
             return False
-        return energy >= 30 and health >= 35
+        return energy >= 10 and health >= 10
 
     def _build_followup_view(
         self,

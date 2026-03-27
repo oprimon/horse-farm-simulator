@@ -1301,7 +1301,11 @@ def train_horse_flow(
     current_skill = _clamp_stat(int(horse.get("skill") or 0))
     current_confidence = _clamp_stat(int(horse.get("confidence") or 0))
 
-    if current_energy < 30 or current_health < 35:
+    # Option A safety rule for training: require enough stats to cover
+    # maximum possible training losses.
+    # - Energy always decreases by up to 10 (1d10), so require at least 10.
+    # - Health has a slight chance to decrease by up to 10 (1d10), so require at least 10.
+    if current_energy < 10 or current_health < 10:
         state_presentation = build_horse_state_presentation(horse)
         recovery_guidance = "Try `/feed` or `/rest` first, then come back to `/train`."
         message = (

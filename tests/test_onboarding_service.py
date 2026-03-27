@@ -957,7 +957,7 @@ def test_train_horse_flow_refuses_when_energy_or_health_is_too_low(tmp_path) -> 
     repository.update_horse_state(
         user_id=942,
         guild_id=943,
-        updates={"energy": 24, "health": 80, "last_trained_at": None, "recent_activity": None},
+        updates={"energy": 9, "health": 80, "last_trained_at": None, "recent_activity": None},
     )
 
     result = train_horse_flow(
@@ -980,7 +980,7 @@ def test_train_horse_flow_refuses_when_energy_or_health_is_too_low(tmp_path) -> 
 
     persisted = repository.get_player(user_id=942, guild_id=943)
     assert persisted is not None
-    assert persisted["horse"]["energy"] == 24
+    assert persisted["horse"]["energy"] == 9
     assert persisted["horse"]["last_trained_at"] is None
     assert persisted["horse"]["recent_activity"] is None
 

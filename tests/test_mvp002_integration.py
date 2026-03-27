@@ -238,7 +238,7 @@ def test_mvp002_failure_paths_before_adoption_and_train_refusal(tmp_path) -> Non
     repository.update_horse_state(
         user_id=5202,
         guild_id=6201,
-        updates={"energy": 24, "health": 80, "last_trained_at": None, "recent_activity": None},
+        updates={"energy": 9, "health": 80, "last_trained_at": None, "recent_activity": None},
     )
 
     train_result = train_horse_flow(

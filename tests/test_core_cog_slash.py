@@ -311,12 +311,12 @@ def test_can_train_from_player_applies_energy_and_health_constraints(tmp_path) -
 
     assert core_cog._can_train_from_player(None) is False
     assert core_cog._can_train_from_player({"adopted": False}) is False
-    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 29, "health": 35}}) is False
-    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 30, "health": 34}}) is False
-    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 30, "health": 35}}) is True
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 9, "health": 10}}) is False
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 10, "health": 9}}) is False
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 10, "health": 10}}) is True
 
 
-def test_build_followup_view_returns_ride_for_feed_when_ready(tmp_path) -> None:
+def test_build_followup_view_returns_train_and_ride_for_feed_when_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
         has_adopted_horse=True,
@@ -328,8 +328,8 @@ def test_build_followup_view_returns_ride_for_feed_when_ready(tmp_path) -> None:
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
-    assert len(buttons) == 1
-    assert buttons[0].label == "🐎 Ride"
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🎓 Train", "🐎 Ride"]
 
 
 def test_build_followup_view_returns_train_and_ride_for_rest_when_fully_ready(tmp_path) -> None:
