@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 import logging
 import random
 from typing import Callable, Sequence
@@ -14,10 +13,20 @@ from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.repositories.player_repository import CandidateRecord, PlayerRecord
 
 from .candidate_generator import generate_candidate_horses
+from .flow_utils import (
+    chance_to_decrease as _chance_to_decrease,
+    chance_to_increase as _chance_to_increase,
+    clamp_stat as _clamp_stat,
+    emit_telemetry as _emit_telemetry,
+    roll_d10 as _roll_d10,
+    roll_d100 as _roll_d100,
+    slight_chance_to_decrease as _slight_chance_to_decrease,
+    timestamp_now as _timestamp_now,
+)
 from .moderation import contains_blocked_name_term, validate_horse_name
 from .ride_outcomes import RideOutcomeResult, select_ride_outcome
 from .state_presentation import build_horse_state_presentation
-from .telemetry import TelemetryEventName, TelemetryLogger
+from .telemetry import TelemetryLogger
 
 
 _RIDE_GENERIC_OPENING_POOL: tuple[str, ...] = (
@@ -1733,79 +1742,6 @@ def stable_roster_flow(
     )
 
 
-def _emit_telemetry(
-    telemetry_logger: TelemetryLogger | None,
-    event_name: TelemetryEventName,
-    user_id: int,
-    guild_id: int | None,
-    candidate_id: str | None = None,
-    horse_name: str | None = None,
-    outcome_id: str | None = None,
-    outcome_category: str | None = None,
-) -> None:
-    if telemetry_logger is None:
-        return
-    telemetry_logger.emit(
-        event_name=event_name,
-        user_id=user_id,
-        guild_id=guild_id,
-        candidate_id=candidate_id,
-        horse_name=horse_name,
-        outcome_id=outcome_id,
-        outcome_category=outcome_category,
-    )
-
-
-def _roll_d10() -> int:
-    """Return a uniform d10 roll for state deltas."""
-    return random.randint(1, 10)
-
-
-def _roll_d100() -> int:
-    """Return a uniform d100 roll for chance-based checks."""
-    return random.randint(1, 100)
-
-
-def _chance_to_increase(
-    current_value: int,
-    d100_roll: Callable[[], int] | None,
-    d10_roll: Callable[[], int] | None,
-) -> int:
-    check_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
-    if check_roll <= current_value:
-        return 0
-
-    rolled_gain = d10_roll() if d10_roll is not None else _roll_d10()
-    return _clamp_stat(rolled_gain, minimum=1, maximum=10)
-
-
-def _chance_to_decrease(
-    checked_value: int,
-    d100_roll: Callable[[], int] | None,
-    d10_roll: Callable[[], int] | None,
-) -> int:
-    """Roll 1d100 against checked_value; if roll exceeds it, return a 1d10 loss amount."""
-    check_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
-    if check_roll <= checked_value:
-        return 0
-    rolled_loss = d10_roll() if d10_roll is not None else _roll_d10()
-    return _clamp_stat(rolled_loss, minimum=1, maximum=10)
-
-
-def _slight_chance_to_decrease(
-    checked_value: int,
-    d100_roll: Callable[[], int] | None,
-    d10_roll: Callable[[], int] | None,
-) -> int:
-    first_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
-    second_roll = _clamp_stat((d100_roll() if d100_roll is not None else _roll_d100()), minimum=1)
-    if first_roll <= checked_value or second_roll <= checked_value:
-        return 0
-
-    rolled_loss = d10_roll() if d10_roll is not None else _roll_d10()
-    return _clamp_stat(rolled_loss, minimum=1, maximum=10)
-
-
 def _compose_ride_roll_narrative(
     horse_name: str,
     ride_stat: str,
@@ -1896,16 +1832,6 @@ def _delta_tier(amount: int, max_amount: int) -> str:
 
 def _pick(pool: Sequence[str], rng: random.Random) -> str:
     return rng.choice(tuple(pool))
-
-
-def _clamp_stat(value: int, minimum: int = 0, maximum: int = 100) -> int:
-    """Clamp a horse state value within configured bounds."""
-    return max(minimum, min(maximum, int(value)))
-
-
-def _timestamp_now() -> str:
-    """Return the current UTC timestamp in ISO 8601 format."""
-    return datetime.now(tz=UTC).isoformat()
 
 
 def _resolve_owner_display_name(
