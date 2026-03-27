@@ -306,6 +306,16 @@ def test_can_ride_from_player_applies_energy_and_health_constraints(tmp_path) ->
     assert core_cog._can_ride_from_player({"adopted": True, "horse": {"energy": 30, "health": 10}}) is True
 
 
+def test_can_train_from_player_applies_energy_and_health_constraints(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+
+    assert core_cog._can_train_from_player(None) is False
+    assert core_cog._can_train_from_player({"adopted": False}) is False
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 29, "health": 35}}) is False
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 30, "health": 34}}) is False
+    assert core_cog._can_train_from_player({"adopted": True, "horse": {"energy": 30, "health": 35}}) is True
+
+
 def test_build_followup_view_returns_ride_for_feed_when_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
@@ -320,6 +330,52 @@ def test_build_followup_view_returns_ride_for_feed_when_ready(tmp_path) -> None:
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
     assert len(buttons) == 1
     assert buttons[0].label == "🐎 Ride"
+
+
+def test_build_followup_view_returns_train_and_ride_for_rest_when_fully_ready(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        has_adopted_horse=True,
+        blocked_by_readiness=False,
+        player={"adopted": True, "horse": {"energy": 30, "health": 35}},
+    )
+
+    view = core_cog._build_followup_view(command_id="rest", result=result, owner_user_id=101)
+
+    assert view is not None
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🎓 Train", "🐎 Ride"]
+
+
+def test_respond_with_result_builds_followup_view_for_rest_when_ready(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+
+    result = SimpleNamespace(
+        message="ok",
+        presentation=None,
+        has_adopted_horse=True,
+        blocked_by_readiness=False,
+        player={"adopted": True, "horse": {"energy": 30, "health": 35}},
+    )
+
+    asyncio.run(
+        core_cog._respond_with_result(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="rest",
+            result=result,  # type: ignore[arg-type]
+            owner_user_id=101,
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    view = sent["view"]
+    assert isinstance(view, discord.ui.View)
+    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
+    labels = [btn.label for btn in buttons]
+    assert labels == ["🎓 Train", "🐎 Ride"]
 
 
 def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> None:

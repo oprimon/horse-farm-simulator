@@ -112,7 +112,7 @@ class CoreCog(commands.Cog):
     ) -> None:
         """Canonical response renderer for slash and button-triggered flows."""
         response_view = view
-        if response_view is None and owner_user_id is not None and command_id in {"feed", "groom", "train", "ride"}:
+        if response_view is None and owner_user_id is not None and command_id in {"feed", "groom", "rest", "train", "ride"}:
             followup_result = self._as_followup_result(result)
             if followup_result is not None:
                 response_view = self._build_followup_view(
@@ -320,21 +320,30 @@ class CoreCog(commands.Cog):
 
         return view
 
-    def _build_ride_view(self, *, owner_user_id: int) -> discord.ui.View:
-        """Build a single quick-action Ride button."""
+    def _build_progression_view(
+        self,
+        *,
+        owner_user_id: int,
+        include_train: bool,
+        include_ride: bool,
+    ) -> discord.ui.View | None:
+        """Build follow-up progression actions based on current readiness."""
+        if not include_train and not include_ride:
+            return None
+
         cog = self
 
-        class RideActionView(discord.ui.View):
+        class ProgressionActionView(discord.ui.View):
             def __init__(self) -> None:
                 super().__init__(timeout=300)
 
-            async def _run(self, interaction: discord.Interaction) -> None:
+            async def _run(self, interaction: discord.Interaction, flow_fn, command_id: str) -> None:
                 await cog._execute_owner_guarded_flow(
                     interaction=interaction,
                     owner_user_id=owner_user_id,
-                    command_id="ride",
-                    wrong_user_message="Only the horse's owner can use this action.",
-                    flow_runner=lambda guild_id, display_name: ride_horse_flow(
+                    command_id=command_id,
+                    wrong_user_message="Only the horse's owner can use these actions.",
+                    flow_runner=lambda guild_id, display_name: flow_fn(
                         repository=cog._repository,
                         user_id=interaction.user.id,
                         guild_id=guild_id,
@@ -343,19 +352,41 @@ class CoreCog(commands.Cog):
                     ),
                 )
 
-        view = RideActionView()
+        view = ProgressionActionView()
+        actions: list[tuple[str, str, object, discord.ButtonStyle]] = []
+        if include_train:
+            actions.append(("🎓 Train", "train", train_horse_flow, discord.ButtonStyle.danger))
+        if include_ride:
+            actions.append(("🐎 Ride", "ride", ride_horse_flow, discord.ButtonStyle.danger))
 
-        async def _callback(interaction: discord.Interaction) -> None:
-            await view._run(interaction)
+        for label, cmd_id, flow_fn, style in actions:
+            async def _callback(
+                interaction: discord.Interaction,
+                _flow=flow_fn,
+                _cmd=cmd_id,
+            ) -> None:
+                await view._run(interaction, _flow, _cmd)
 
-        button = discord.ui.Button(
-            label="🐎 Ride",
-            style=discord.ButtonStyle.danger,
-            custom_id="quick_ride",
-        )
-        button.callback = _callback
-        view.add_item(button)
+            button = discord.ui.Button(
+                label=label,
+                style=style,
+                custom_id=f"progression_{cmd_id}",
+            )
+            button.callback = _callback
+            view.add_item(button)
+
         return view
+
+    def _build_ride_view(self, *, owner_user_id: int) -> discord.ui.View:
+        """Build a single quick-action Ride button."""
+        ride_view = self._build_progression_view(
+            owner_user_id=owner_user_id,
+            include_train=False,
+            include_ride=True,
+        )
+        if ride_view is None:
+            raise RuntimeError("Expected ride view to include at least one action.")
+        return ride_view
 
     def _build_stable_view(self) -> discord.ui.View:
         """Build stable-level quick actions."""
@@ -393,6 +424,20 @@ class CoreCog(commands.Cog):
             return False
         return energy >= 30 and health >= 10
 
+    def _can_train_from_player(self, player: dict[str, object] | None) -> bool:
+        """Return whether a player's horse currently meets training readiness constraints."""
+        if player is None or not bool(player.get("adopted", False)):
+            return False
+        horse = player.get("horse")
+        if not isinstance(horse, dict):
+            return False
+        try:
+            energy = int(horse.get("energy") or 0)
+            health = int(horse.get("health") or 0)
+        except (TypeError, ValueError):
+            return False
+        return energy >= 30 and health >= 35
+
     def _build_followup_view(
         self,
         *,
@@ -405,8 +450,12 @@ class CoreCog(commands.Cog):
         blocked_by_readiness = result.blocked_by_readiness
         player = result.player
 
-        if command_id in {"feed", "groom"}:
-            return self._build_ride_view(owner_user_id=owner_user_id) if self._can_ride_from_player(player) else None
+        if command_id in {"feed", "groom", "rest"}:
+            return self._build_progression_view(
+                owner_user_id=owner_user_id,
+                include_train=self._can_train_from_player(player),
+                include_ride=self._can_ride_from_player(player),
+            )
 
         if command_id == "train":
             if has_adopted_horse and blocked_by_readiness:
@@ -676,6 +725,7 @@ class CoreCog(commands.Cog):
             interaction=interaction,
             command_id="rest",
             result=result,
+            owner_user_id=interaction.user.id,
         )
 
     @app_commands.command(name="train", description="Train your adopted horse to build skill and confidence")
