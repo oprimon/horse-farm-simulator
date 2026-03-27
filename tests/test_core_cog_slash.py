@@ -3,6 +3,7 @@
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import discord
 
@@ -10,6 +11,11 @@ from pferdehof_bot.bot import create_bot, load_extensions
 from pferdehof_bot.cogs.core import CoreCog
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services.onboarding import PresentationField, ResponsePresentation
+
+
+def _fake_http_response(*, status: int, reason: str) -> Any:
+    """Return a minimal response-like object for discord HTTP exception tests."""
+    return cast(Any, SimpleNamespace(status=status, reason=reason))
 
 
 def test_core_cog_registers_slash_commands() -> None:
@@ -99,6 +105,8 @@ class _FakeInteractionResponse:
 class _FakeInteraction:
     def __init__(self) -> None:
         self.response = _FakeInteractionResponse()
+        self.user: object = SimpleNamespace(id=0, name="User", display_name="User")
+        self.guild: object | None = None
 
 
 def _build_core_cog(tmp_path: Path) -> CoreCog:
@@ -140,8 +148,8 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
         members={},
         fetch_results={},
         fetch_errors={
-            200: discord.NotFound(response=SimpleNamespace(status=404, reason="missing"), message="missing"),
-            201: discord.Forbidden(response=SimpleNamespace(status=403, reason="forbidden"), message="forbidden"),
+            200: discord.NotFound(response=_fake_http_response(status=404, reason="missing"), message="missing"),
+            201: discord.Forbidden(response=_fake_http_response(status=403, reason="forbidden"), message="forbidden"),
         },
     )
 
@@ -275,7 +283,7 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     intruder_interaction.guild = None
 
     asyncio.run(
-        view._run(
+        cast(Any, view)._run(
             intruder_interaction,  # type: ignore[arg-type]
             lambda **_: None,
             "feed",
@@ -361,12 +369,14 @@ def test_can_train_from_player_applies_energy_and_health_constraints(tmp_path) -
 def test_build_followup_view_returns_train_and_ride_for_feed_when_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 30, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="feed", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="feed", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -377,12 +387,14 @@ def test_build_followup_view_returns_train_and_ride_for_feed_when_ready(tmp_path
 def test_build_followup_view_returns_train_and_ride_for_rest_when_fully_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 30, "health": 35}},
     )
 
-    view = core_cog._build_followup_view(command_id="rest", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="rest", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -452,12 +464,14 @@ def test_respond_with_result_builds_followup_view_for_care_result_without_blocke
 def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=True,
         player={"adopted": True, "horse": {"energy": 10, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="train", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="train", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -468,12 +482,14 @@ def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> No
 def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=True,
         player={"adopted": True, "horse": {"energy": 10, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="ride", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -484,12 +500,14 @@ def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> Non
 def test_build_followup_view_returns_profile_for_successful_ride(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 40, "health": 70}},
     )
 
-    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="ride", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -499,7 +517,7 @@ def test_build_followup_view_returns_profile_for_successful_ride(tmp_path) -> No
 
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
-    candidates = [
+    candidates: list[dict[str, object]] = [
         {"id": "A", "appearance_text": "Chestnut"},
         {"id": "B", "appearance_text": "Bay"},
         {"id": "C", "appearance_text": "Grey"},
@@ -515,7 +533,7 @@ def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -
 
 def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
-    candidates = [{"id": "Z"}]
+    candidates: list[dict[str, object]] = [{"id": "Z"}]
 
     view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
 
@@ -525,7 +543,7 @@ def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) ->
 def test_candidate_view_rejects_interaction_from_wrong_user(tmp_path) -> None:
     """A user who did not open /horse view cannot choose via the button panel."""
     core_cog = _build_core_cog(tmp_path)
-    candidates = [
+    candidates: list[dict[str, object]] = [
         {"id": "A", "appearance_text": "Chestnut"},
         {"id": "B", "appearance_text": "Bay"},
         {"id": "C", "appearance_text": "Grey"},
@@ -544,7 +562,7 @@ def test_candidate_view_rejects_interaction_from_wrong_user(tmp_path) -> None:
     assert len(intruder_response.calls) == 1
     call = intruder_response.calls[0]
     assert call["ephemeral"] is True
-    assert "Only the player" in call["content"]
+    assert "Only the player" in str(call["content"])
     # Buttons must still be enabled after an unauthorized attempt.
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
     assert all(not btn.disabled for btn in buttons)
@@ -567,7 +585,7 @@ def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> No
     )
     bot = create_bot()
     cog = CoreCog(bot=bot, repository=repository)
-    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    candidates: list[dict[str, object]] = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
     view = cog._build_candidate_view(candidates=candidates, owner_user_id=200)
     assert view is not None
 
@@ -592,7 +610,7 @@ def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> No
 def test_candidate_view_on_timeout_disables_all_buttons(tmp_path) -> None:
     """on_timeout disables every button so an expired panel is visually clear."""
     core_cog = _build_core_cog(tmp_path)
-    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    candidates: list[dict[str, object]] = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
     view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
     assert view is not None
 
