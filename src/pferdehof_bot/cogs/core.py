@@ -7,7 +7,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from pferdehof_bot.command_registry import ResponseVisibility, get_command_metadata
+from pferdehof_bot.cogs.shared.context import build_owner_display_name_map, resolve_interaction_context
+from pferdehof_bot.cogs.shared.responder import build_embed, send_response
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services.care import feed_horse_flow, groom_horse_flow, rest_horse_flow
 from pferdehof_bot.services.lifecycle import (
@@ -74,29 +75,11 @@ class CoreCog(commands.Cog):
 
     def _build_embed(self, presentation: ResponsePresentation) -> discord.Embed:
         """Build a Discord embed from a service presentation payload."""
-        accent = (presentation.accent or "").lower()
-        color_by_accent: dict[str, discord.Color] = {
-            "success": discord.Color.green(),
-            "warning": discord.Color.orange(),
-            "error": discord.Color.red(),
-            "info": discord.Color.blurple(),
-        }
-        embed = discord.Embed(
-            title=presentation.title,
-            description=presentation.description,
-            color=color_by_accent.get(accent, discord.Color.light_grey()),
-        )
-        for field in presentation.fields:
-            embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        if presentation.footer is not None:
-            embed.set_footer(text=presentation.footer)
-        return embed
+        return build_embed(presentation)
 
     def _resolve_interaction_context(self, interaction: discord.Interaction) -> tuple[int | None, str]:
         """Return common per-interaction context used by service flows."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
-        return guild_id, display_name
+        return resolve_interaction_context(interaction)
 
     async def _respond_with_result(
         self,
@@ -538,21 +521,13 @@ class CoreCog(commands.Cog):
         view: discord.ui.View | None = None,
     ) -> None:
         """Send a response based on command visibility metadata."""
-        metadata = get_command_metadata(command_id)
-        is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
-        embed = self._build_embed(presentation) if presentation is not None else None
-        # When an embed is present, suppress the plain-text content so Discord
-        # does not render both the text and the card side-by-side.
-        if embed is not None and view is not None:
-            await interaction.response.send_message(None, embed=embed, view=view, ephemeral=is_ephemeral)
-            return
-        if embed is not None:
-            await interaction.response.send_message(None, embed=embed, ephemeral=is_ephemeral)
-            return
-        if view is not None:
-            await interaction.response.send_message(message, view=view, ephemeral=is_ephemeral)
-            return
-        await interaction.response.send_message(message, ephemeral=is_ephemeral)
+        await send_response(
+            interaction=interaction,
+            command_id=command_id,
+            message=message,
+            presentation=presentation,
+            view=view,
+        )
 
     async def _build_owner_display_name_map(
         self,
@@ -562,25 +537,12 @@ class CoreCog(commands.Cog):
         interaction_display_name: str,
     ) -> dict[int, str]:
         """Resolve owner names with guild-display priority and API fallback."""
-        resolved_names: dict[int, str] = {}
-        for owner_user_id in owner_user_ids:
-            if owner_user_id == interaction_user_id:
-                resolved_names[owner_user_id] = interaction_display_name
-                continue
-
-            member = guild.get_member(owner_user_id)
-            if member is not None:
-                resolved_names[owner_user_id] = getattr(member, "display_name", member.name)
-                continue
-
-            try:
-                fetched_member = await guild.fetch_member(owner_user_id)
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                continue
-
-            resolved_names[owner_user_id] = getattr(fetched_member, "display_name", fetched_member.name)
-
-        return resolved_names
+        return await build_owner_display_name_map(
+            guild=guild,
+            owner_user_ids=owner_user_ids,
+            interaction_user_id=interaction_user_id,
+            interaction_display_name=interaction_display_name,
+        )
 
     @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
     async def start(self, interaction: discord.Interaction) -> None:

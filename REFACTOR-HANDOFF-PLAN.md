@@ -2,11 +2,12 @@
 
 ## Current Snapshot
 - Branch: `dev`
-- Current `HEAD`: `49c8411`
-- Working tree status at start of this run:
-  - modified: `REFACTOR-HANDOFF-PLAN.md`
-- Active shown problem at start:
-  - `src/pferdehof_bot/bot.py`: assignment to `intents.message_content` flagged by static checker.
+- Current `HEAD`: `a6a4233`
+- Working tree status now:
+  - modified: `src/pferdehof_bot/cogs/core.py`
+  - untracked: `src/pferdehof_bot/cogs/shared/`
+- Active shown problems now:
+  - none (latest diagnostics check clean).
 
 ## Objectives For This Run
 1. Start implementation now with small, safe increments.
@@ -22,13 +23,25 @@
   - fix active typing problem in `src/pferdehof_bot/bot.py`.
   - validate with full pytest.
   - commit on `dev`.
-- Status: **in progress**
+- Status: **completed**
+- Completion details:
+  - Commit: `a6a4233` (`fix(bot): resolve intents typing diagnostic and start refactor tracker`)
+  - Verification: full pytest passed (`166 passed`).
 
 ### Phase 2: Shared transport extraction from core cog
 - Scope:
   - extract response rendering and interaction context helpers.
   - keep command behavior unchanged.
-- Status: pending
+- Status: **completed (ready to commit)**
+- Completed in workspace:
+  - Added `src/pferdehof_bot/cogs/shared/context.py`.
+  - Added `src/pferdehof_bot/cogs/shared/responder.py`.
+  - Added `src/pferdehof_bot/cogs/shared/__init__.py`.
+  - Updated `src/pferdehof_bot/cogs/core.py` to delegate context/response logic to shared helpers.
+- Verification:
+  - diagnostics: clean for edited files.
+  - targeted tests: `37 passed`.
+  - full suite: `166 passed`.
 
 ### Phase 3: View factory extraction
 - Scope:
@@ -67,9 +80,12 @@
 ## Live Progress Log
 - 2026-03-28: Phase 1 started.
 - 2026-03-28: Removed `intents.message_content = False` in `src/pferdehof_bot/bot.py` to resolve static typing issue while preserving runtime behavior (`Intents.default()` already leaves message content intent disabled).
-- 2026-03-28: Next step: run diagnostics + full pytest, then commit Phase 1.
+- 2026-03-28: Diagnostics check clean and full pytest passed (`166 passed`) for Phase 1.
+- 2026-03-28: Committed and pushed Phase 1 as `a6a4233` on `dev`.
+- 2026-03-28: Extracted shared transport helpers (`context.py`, `responder.py`) and wired `core.py` to use them.
+- 2026-03-28: Post-extraction validation complete: targeted (`37 passed`) and full suite (`166 passed`) green.
 
 ## Next Actions
-1. Validate no shown problems remain.
-2. Run full pytest.
-3. Commit Phase 1 and update this document with commit hash and results.
+1. Commit and push Phase 2 extraction changes.
+2. Start Phase 3 by extracting inline view classes from `core.py` into view modules.
+3. Run targeted tests after each view family migration, then full pytest before commit.
