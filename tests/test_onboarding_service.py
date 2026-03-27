@@ -423,10 +423,11 @@ def test_horse_profile_flow_renders_adopted_horse_profile(tmp_path) -> None:
     assert "Appearance: Chestnut with bright blaze" in result.message
     assert "Visible traits: steady, curious" in result.message
     assert "Mood: Luna feels eager and ready for a confident outing." in result.message
-    assert "Bond: Luna is deeply connected and affectionate with you." in result.message
-    assert "Energy: Luna is bright-eyed and eager to move." in result.message
-    assert "Confidence: Luna is bold and excited to try new things." in result.message
-    assert "Skill: Luna is building good habits and balance." in result.message
+    assert "Bond (80): Luna is deeply connected and affectionate with you." in result.message
+    assert "Energy (72): Luna is bright-eyed and eager to move." in result.message
+    assert "Health (78): Luna is strong and in great shape." in result.message
+    assert "Confidence (68): Luna is bold and excited to try new things." in result.message
+    assert "Skill (61): Luna is building good habits and balance." in result.message
     assert "Recent activity: Shared a gentle arena walk." in result.message
 
 

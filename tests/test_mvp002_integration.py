@@ -185,7 +185,7 @@ def test_mvp002_happy_path_care_to_train_to_ride_with_stable(tmp_path) -> None:
     assert ride_result.outcome.recent_activity_text in profile_result.message
     assert profile_result.presentation is not None
     assert "Luna" in profile_result.presentation.title
-    assert len(profile_result.presentation.fields) == 6
+    assert len(profile_result.presentation.fields) == 7
 
     stable_result = stable_roster_flow(
         repository=repository,

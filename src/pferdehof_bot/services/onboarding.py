@@ -958,10 +958,11 @@ def horse_profile_flow(
         f"Appearance: {appearance}",
         f"Visible traits: {traits_text}",
         f"Mood: {horse_name} feels {state_presentation.readiness_feel}.",
-        f"Bond: {horse_name} is {state_presentation.bond_feel} with you.",
-        f"Energy: {horse_name} is {state_presentation.energy_feel}.",
-        f"Confidence: {horse_name} is {state_presentation.confidence_feel}.",
-        f"Skill: {horse_name} is {state_presentation.skill_feel}.",
+        f"Bond ({state_presentation.bond_value}): {horse_name} is {state_presentation.bond_feel} with you.",
+        f"Energy ({state_presentation.energy_value}): {horse_name} is {state_presentation.energy_feel}.",
+        f"Health ({state_presentation.health_value}): {horse_name} is {state_presentation.health_feel}.",
+        f"Confidence ({state_presentation.confidence_value}): {horse_name} is {state_presentation.confidence_feel}.",
+        f"Skill ({state_presentation.skill_value}): {horse_name} is {state_presentation.skill_feel}.",
     ]
 
     if state_presentation.recent_activity_text is None:
