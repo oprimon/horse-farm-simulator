@@ -2,10 +2,8 @@
 
 ## Current Snapshot
 - Branch: `dev`
-- Current `HEAD`: `e757c3a`
+- Current `HEAD`: `e5285a9`
 - Working tree status now:
-  - modified: `src/pferdehof_bot/cogs/core.py`
-  - modified: `src/pferdehof_bot/services/progression.py`
   - modified: `REFACTOR-HANDOFF-PLAN.md`
 - Active shown problems now:
   - none (latest diagnostics check clean).
@@ -53,7 +51,9 @@
 ### Phase 4: Readiness policy extraction
 - Scope:
   - move train/ride readiness checks out of cog and into service-layer policy helpers.
-- Status: **completed (ready to commit)**
+- Status: **completed**
+- Commit:
+  - `e5285a9` (`refactor(progression): centralize ride and train readiness policy`)
 - Completed in workspace:
   - Added `can_train_player` and `can_ride_player` to `src/pferdehof_bot/services/progression.py`.
   - Updated `src/pferdehof_bot/cogs/core.py` readiness methods to delegate to progression helpers.
@@ -95,8 +95,9 @@
 - 2026-03-28: Committed and pushed Phase 2 as `e757c3a` on `dev`.
 - 2026-03-28: Extracted readiness policy helpers into progression service and switched `core.py` to delegate.
 - 2026-03-28: Readiness extraction validation complete: targeted (`47 passed`) and full suite (`166 passed`) green.
+- 2026-03-28: Committed and pushed Phase 4 as `e5285a9` on `dev`.
 
 ## Next Actions
-1. Commit and push Phase 4 readiness extraction changes.
-2. Start Phase 3 by extracting inline view classes from `core.py` into view modules.
-3. Run targeted tests after each view family migration, then full pytest before each commit.
+1. Start Phase 3 by extracting inline view classes from `core.py` into view modules.
+2. Run targeted tests after each view family migration, then full pytest before each commit.
+3. Commit and push each completed extraction slice on `dev`.
