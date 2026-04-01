@@ -613,6 +613,7 @@ class CoreCog(commands.Cog):
         owner_user_ids: set[int],
         interaction_user_id: int,
         interaction_display_name: str,
+        allow_fetch: bool = True,
     ) -> dict[int, str]:
         """Resolve owner names with guild-display priority and API fallback."""
         return await build_owner_display_name_map(
@@ -620,6 +621,7 @@ class CoreCog(commands.Cog):
             owner_user_ids=owner_user_ids,
             interaction_user_id=interaction_user_id,
             interaction_display_name=interaction_display_name,
+            allow_fetch=allow_fetch,
         )
 
     @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
@@ -923,22 +925,22 @@ class CoreCog(commands.Cog):
 
         guild_id = guild.id
         raw_rows = self._repository.list_adopted_horses_by_guild(guild_id=guild_id)
-        owner_user_ids = {int(row["owner_user_id"]) for row in raw_rows}
+        filtered_rows = [row for row in raw_rows if int(row["owner_user_id"]) != interaction.user.id]
+        owner_user_ids = {int(row["owner_user_id"]) for row in filtered_rows}
         interaction_display_name = getattr(interaction.user, "display_name", interaction.user.name)
         owner_display_names = await self._build_owner_display_name_map(
             guild=guild,
             owner_user_ids=owner_user_ids,
             interaction_user_id=interaction.user.id,
             interaction_display_name=interaction_display_name,
+            allow_fetch=False,
         )
 
         normalized_current = str(current).strip().lower()
         choices: list[app_commands.Choice[str]] = []
-        for row in raw_rows:
+        for row in filtered_rows:
             horse_id = int(row["horse_id"])
             owner_user_id = int(row["owner_user_id"])
-            if owner_user_id == interaction.user.id:
-                continue
             horse_name = str(row["horse_name"])
             owner_name = owner_display_names.get(owner_user_id, f"Rider {owner_user_id}")
             label = f"#{horse_id} | {horse_name} | {owner_name}"
