@@ -11,10 +11,11 @@ This file defines an easy-to-extend content format for playdate stories so maint
 
 ## Contribution Flow
 
-1. Copy `docs/playdate_story_suggestions_template.json`.
-2. Add or edit story entries.
-3. Keep placeholders valid.
-4. Open a PR with your new stories.
+1. Create a new JSON file in the `stories/` folder (e.g. `stories/my_ideas.json`).
+2. Use `docs/playdate_story_suggestions_template.json` as a starting point for the entry shape.
+3. Add one or more story objects inside the `"stories"` array.
+4. Keep all placeholders valid (see Allowed Placeholders below).
+5. Open a PR — the engine scans every `*.json` file in `stories/` automatically on each `/playdate` call, so your stories go live as soon as the PR merges without any code change or restart.
 
 ## Template Fields
 
@@ -47,15 +48,34 @@ Each story entry uses this shape:
 }
 ```
 
+## Message Structure
+
+The engine assembles each playdate message in this fixed order:
+
+```
+[opening] [energy stat] [confidence stat] [bond stat] [event] [cameo] [ending]
+```
+
+The stat and cameo fragments are injected automatically — story files only need to provide the five line groups: `opening_lines`, `event_lines`, `ending_lines`, and the three `cameo_*_lines`.
+
+**Tips per field:**
+
+- **opening_lines** — Set the scene. The very next sentence the engine adds will describe how one of the horses is feeling energy-wise, so avoid energy or tiredness references here.
+- **event_lines** — Describe the main action. This line follows directly after a stat sentence such as *"Nova settles into a steady rhythm…"*. Write events that read naturally after that kind of flavor.
+- **ending_lines** — Punch-line close. Written after the cameo line. Keep it standalone and satisfying; it should feel complete whether a player name appeared just before or not.
+- **cameo_none_lines** — Stable or environment observation when no player cameo fires. Do not reference player placeholders here.
+- **cameo_one_lines** — One randomly selected player appears. Use only `{one_player}` here; do **not** use `{initiator_player}` or `{target_player}` (they will render as literal text).
+- **cameo_both_lines** — Both players appear. Use `{initiator_player}` and `{target_player}`. Do not use `{one_player}` here.
+
 ## Allowed Placeholders
 
 Use only these placeholders in story lines:
 
-- `{initiator_horse}`
-- `{target_horse}`
-- `{initiator_player}`
-- `{target_player}`
-- `{one_player}`
+- `{initiator_horse}` — available in all six line groups
+- `{target_horse}` — available in all six line groups
+- `{initiator_player}` — available in all six line groups, but only meaningful in `cameo_both_lines`
+- `{target_player}` — available in all six line groups, but only meaningful in `cameo_both_lines`
+- `{one_player}` — **only** valid in `cameo_one_lines` and `cameo_both_lines`; causes a runtime error if used in `opening_lines`, `event_lines`, or `ending_lines`
 
 ## Writing Guidelines
 

@@ -25,6 +25,7 @@ from .playdate_story_engine import (
 	PlaydateNarrative,
 	PlaydateStoryContext,
 	PlaydateStoryTemplate,
+	load_story_packs_from_folder,
 	render_playdate_narrative,
 )
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome

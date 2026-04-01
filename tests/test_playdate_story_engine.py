@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import random
 
-from pferdehof_bot.services.playdate_story_engine import PlaydateStoryContext, render_playdate_narrative
+from pferdehof_bot.services.playdate_story_engine import (
+    PlaydateStoryContext,
+    load_story_packs_from_folder,
+    render_playdate_narrative,
+)
 
 
 def _context() -> PlaydateStoryContext:
@@ -60,3 +66,92 @@ def test_render_playdate_narrative_can_include_single_player_cameo() -> None:
 
     assert narrative.story_id == "puddle_sprint"
     assert ("Mia" in narrative.message) or ("Rowan" in narrative.message)
+
+
+def test_load_story_packs_from_folder_loads_valid_json(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "test.json").write_text(
+        json.dumps({
+            "stories": [{
+                "story_id": "test_story",
+                "tone": "funny",
+                "title": "Test Story",
+                "weight": 5,
+                "opening_lines": ["Opening line."],
+                "event_lines": ["Event line."],
+                "ending_lines": ["Ending line."],
+                "cameo_none_lines": ["No cameo."],
+                "cameo_one_lines": ["{one_player} appears."],
+                "cameo_both_lines": ["{initiator_player} and {target_player} watch."],
+            }]
+        }),
+        encoding="utf-8",
+    )
+    stories = load_story_packs_from_folder(stories_dir)
+    assert len(stories) == 1
+    assert stories[0].story_id == "test_story"
+    assert stories[0].tone == "funny"
+    assert stories[0].weight == 5
+
+
+def test_load_story_packs_from_folder_returns_empty_for_missing_folder(tmp_path: Path) -> None:
+    stories = load_story_packs_from_folder(tmp_path / "nonexistent")
+    assert stories == ()
+
+
+def test_load_story_packs_from_folder_skips_malformed_files(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "bad.json").write_text("not valid json", encoding="utf-8")
+    stories = load_story_packs_from_folder(stories_dir)
+    assert stories == ()
+
+
+def test_load_story_packs_from_folder_skips_malformed_entries(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "mixed.json").write_text(
+        json.dumps({
+            "stories": [
+                {"story_id": "good", "tone": "cozy", "title": "Good", "weight": 7,
+                 "opening_lines": ["Hello."], "event_lines": ["Event."], "ending_lines": ["End."],
+                 "cameo_none_lines": ["None."], "cameo_one_lines": ["One."], "cameo_both_lines": ["Both."]},
+                {"missing_required_fields": True},
+            ]
+        }),
+        encoding="utf-8",
+    )
+    stories = load_story_packs_from_folder(stories_dir)
+    assert len(stories) == 1
+    assert stories[0].story_id == "good"
+
+
+def test_render_playdate_narrative_uses_folder_stories_when_provided(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "custom.json").write_text(
+        json.dumps({
+            "stories": [{
+                "story_id": "custom_story",
+                "tone": "cozy",
+                "title": "Custom Story",
+                "weight": 10,
+                "opening_lines": ["{initiator_horse} and {target_horse} meet."],
+                "event_lines": ["Things happen."],
+                "ending_lines": ["All is well."],
+                "cameo_none_lines": ["Nobody notices."],
+                "cameo_one_lines": ["{one_player} waves."],
+                "cameo_both_lines": ["{initiator_player} and {target_player} cheer."],
+            }]
+        }),
+        encoding="utf-8",
+    )
+    narrative = render_playdate_narrative(
+        _context(),
+        rng=random.Random(1),
+        story_packs_dir=stories_dir,
+    )
+    assert narrative.story_id == "custom_story"
+    assert narrative.tone == "cozy"
+

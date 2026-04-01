@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
 import random
 
 
@@ -221,16 +223,56 @@ DEFAULT_PLAYDATE_STORIES: tuple[PlaydateStoryTemplate, ...] = (
 )
 
 
+def load_story_packs_from_folder(folder: Path) -> tuple[PlaydateStoryTemplate, ...]:
+    """Load all story pack JSON files from a folder. Invalid files are skipped silently."""
+    if not folder.is_dir():
+        return ()
+    stories: list[PlaydateStoryTemplate] = []
+    for json_file in sorted(folder.glob("*.json")):
+        try:
+            with json_file.open(encoding="utf-8") as f:
+                data = json.load(f)
+            for entry in data.get("stories", []):
+                try:
+                    stories.append(_json_to_story_template(entry))
+                except (KeyError, TypeError, ValueError):
+                    pass  # Skip individual malformed entries
+        except Exception:
+            pass  # Skip unreadable or malformed files
+    return tuple(stories)
+
+
+def _json_to_story_template(data: dict) -> PlaydateStoryTemplate:
+    return PlaydateStoryTemplate(
+        story_id=str(data["story_id"]),
+        tone=str(data["tone"]),
+        title=str(data["title"]),
+        weight=max(1, int(data.get("weight", 7))),
+        opening_lines=tuple(str(line) for line in data.get("opening_lines", [])),
+        event_lines=tuple(str(line) for line in data.get("event_lines", [])),
+        ending_lines=tuple(str(line) for line in data.get("ending_lines", [])),
+        cameo_none_lines=tuple(str(line) for line in data.get("cameo_none_lines", [])),
+        cameo_one_lines=tuple(str(line) for line in data.get("cameo_one_lines", [])),
+        cameo_both_lines=tuple(str(line) for line in data.get("cameo_both_lines", [])),
+    )
+
+
 def render_playdate_narrative(
     context: PlaydateStoryContext,
     *,
     rng: random.Random | None = None,
     story_id_override: str | None = None,
     cameo_override: str | None = None,
+    story_packs_dir: Path | None = None,
 ) -> PlaydateNarrative:
     """Render one playdate narrative from a template plus stat-reactive fragments."""
     resolved_rng = rng or random.Random()
-    story = _choose_story(DEFAULT_PLAYDATE_STORIES, resolved_rng, story_id_override)
+    all_stories = DEFAULT_PLAYDATE_STORIES
+    if story_packs_dir is not None:
+        loaded = load_story_packs_from_folder(story_packs_dir)
+        if loaded:
+            all_stories = loaded
+    story = _choose_story(all_stories, resolved_rng, story_id_override)
     cameo_mode = cameo_override or _choose_cameo_mode(resolved_rng)
 
     line_pool = _format_line_pool(story.opening_lines, context)

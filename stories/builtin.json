@@ -1,0 +1,166 @@
+{
+  "stories": [
+    {
+      "story_id": "brush_conspiracy",
+      "tone": "funny",
+      "title": "The Brush Conspiracy",
+      "weight": 10,
+      "opening_lines": [
+        "{initiator_horse} and {target_horse} discover a grooming brush placed way too neatly in the aisle.",
+        "A suspiciously shiny grooming brush appears, and {initiator_horse} immediately treats it like a relic."
+      ],
+      "event_lines": [
+        "They investigate in dramatic circles and somehow conclude the brush must be guarded.",
+        "Both horses perform an extremely serious inspection routine that convinces nobody and everyone."
+      ],
+      "ending_lines": [
+        "By the end, the brush is exactly where it started and somehow far more important.",
+        "The mystery remains unsolved, but morale in the stable rises significantly."
+      ],
+      "cameo_none_lines": [
+        "No human witnesses step in, so the official report is left to hoofprint interpretation."
+      ],
+      "cameo_one_lines": [
+        "{one_player} tries to restore order and accidentally validates the conspiracy."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} exchange one look that means: let them cook."
+      ]
+    },
+    {
+      "story_id": "apple_diplomacy",
+      "tone": "cozy",
+      "title": "Apple Diplomacy",
+      "weight": 9,
+      "opening_lines": [
+        "A single apple appears, and {initiator_horse} and {target_horse} begin careful negotiations.",
+        "{target_horse} spots an apple and invites {initiator_horse} into a very official treaty process."
+      ],
+      "event_lines": [
+        "Every sniff is followed by a pause as if both horses are drafting amendments.",
+        "The discussion remains peaceful, with occasional nose-boops serving as signatures."
+      ],
+      "ending_lines": [
+        "They finish with shared crunches and a visible increase in mutual respect.",
+        "The final treaty outcome: one apple, two very satisfied horses."
+      ],
+      "cameo_none_lines": [
+        "The stable agrees this was diplomacy at its finest."
+      ],
+      "cameo_one_lines": [
+        "{one_player} arrives with a backup snack and instantly becomes foreign aid."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} call it training; the horses call it lunch policy."
+      ]
+    },
+    {
+      "story_id": "puddle_sprint",
+      "tone": "chaos-lite",
+      "title": "Puddle Sprint",
+      "weight": 8,
+      "opening_lines": [
+        "A tiny puddle becomes a full obstacle course the moment {initiator_horse} notices it.",
+        "{target_horse} declares the puddle lane open, and {initiator_horse} accepts immediately."
+      ],
+      "event_lines": [
+        "Two cautious steps escalate into a surprisingly elegant splash routine.",
+        "They alternate hops like a synchronized team that forgot to register."
+      ],
+      "ending_lines": [
+        "The puddle wins no trophies, but the audience gives thunderous approval anyway.",
+        "Final score: puddle 0, joy 100."
+      ],
+      "cameo_none_lines": [
+        "The stable floor dries eventually; the story does not."
+      ],
+      "cameo_one_lines": [
+        "{one_player} attempts to keep things dry and is politely ignored."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} briefly discuss cleanup logistics, then applaud."
+      ]
+    },
+    {
+      "story_id": "ribbon_heist",
+      "tone": "funny",
+      "title": "The Ribbon Heist",
+      "weight": 8,
+      "opening_lines": [
+        "A decorative ribbon goes missing right as {target_horse} starts looking suspiciously proud.",
+        "{initiator_horse} finds a ribbon and instantly assumes command of an undercover mission."
+      ],
+      "event_lines": [
+        "One horse carries the prize while the other provides dramatic lookout services.",
+        "They parade through the aisle as if this was always the official plan."
+      ],
+      "ending_lines": [
+        "The ribbon is returned with honor and exactly zero explanation.",
+        "No rules are broken on record, yet everyone feels mildly outplayed."
+      ],
+      "cameo_none_lines": [
+        "A nearby pony sighs in admiration at the operational discipline."
+      ],
+      "cameo_one_lines": [
+        "{one_player} asks who started this; both horses refuse to comment."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} hold a quick trial and immediately acquit both suspects."
+      ]
+    },
+    {
+      "story_id": "gate_patrol",
+      "tone": "cozy",
+      "title": "Gate Patrol",
+      "weight": 7,
+      "opening_lines": [
+        "{initiator_horse} and {target_horse} volunteer for an unscheduled gate safety inspection.",
+        "A quiet corner near the gate turns into patrol duty for two very committed horses."
+      ],
+      "event_lines": [
+        "They perform deliberate laps and pause to approve each hinge with solemn nods.",
+        "The inspection includes extra sniffs, careful pacing, and occasional proud snorting."
+      ],
+      "ending_lines": [
+        "Security remains excellent, and both horses leave with heroic energy.",
+        "The patrol wraps up with a shared stance that says job well done."
+      ],
+      "cameo_none_lines": [
+        "The stable ledger records this as preventive maintenance with style."
+      ],
+      "cameo_one_lines": [
+        "{one_player} thanks the patrol officers and receives a very professional nod."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} pretend this was planned all along."
+      ]
+    },
+    {
+      "story_id": "hat_rehearsal",
+      "tone": "funny",
+      "title": "Hat Rehearsal",
+      "weight": 6,
+      "opening_lines": [
+        "Someone leaves a hat on the fence and {target_horse} appoints it as rehearsal equipment.",
+        "{initiator_horse} spots a hat and decides this requires immediate choreography."
+      ],
+      "event_lines": [
+        "The routine includes gentle bows, dramatic turns, and one perfectly timed snort.",
+        "They circle the hat like a stage prop while practicing very serious posture."
+      ],
+      "ending_lines": [
+        "The hat survives. Confidence levels do not return to normal.",
+        "By the finale, both horses look ready for opening night."
+      ],
+      "cameo_none_lines": [
+        "Critics agree the performance was experimental and excellent."
+      ],
+      "cameo_one_lines": [
+        "{one_player} attempts direction and is quickly outdirected."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} become audience members in row one."
+      ]
+    }
+  ]
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import random
+from pathlib import Path
 from typing import Callable
 
 from pferdehof_bot.repositories import JsonPlayerRepository
@@ -17,6 +18,7 @@ from .telemetry import TelemetryLogger
 
 
 SOCIALIZE_COOLDOWN_SECONDS = 60 * 60
+STORY_PACKS_DIR = Path("stories")
 
 
 @dataclass(frozen=True)
@@ -211,6 +213,7 @@ def socialize_horses_flow(
             target_health=int(target_horse.get("health") or 0),
         ),
         rng=rng,
+        story_packs_dir=STORY_PACKS_DIR,
     )
 
     initiator_updates = {
