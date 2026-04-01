@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services.lifecycle import choose_candidate_flow, name_horse_flow, start_onboarding_flow
 from pferdehof_bot.services.social import socialize_horses_flow
@@ -79,6 +81,7 @@ def test_socialize_horses_flow_updates_both_horses_and_emits_event(tmp_path) -> 
         target_display_name="Rowan",
         d10_roll=lambda: 10,
         now_provider=lambda: "2026-04-01T10:00:00+00:00",
+        rng=random.Random(1),
         telemetry_logger=telemetry_logger,
     )
 
@@ -99,11 +102,14 @@ def test_socialize_horses_flow_updates_both_horses_and_emits_event(tmp_path) -> 
     assert target["horse"]["bond"] == 28
     assert target["horse"]["confidence"] == 38
     assert target["horse"]["last_socialized_at"] is None
+    assert "Mia sets up a playdate with Rowan." in result.message
 
     assert [event.get("event_name") for event in telemetry_logger.events] == ["social_interaction_completed"]
     assert telemetry_logger.events[0].get("user_id") == 101
     assert telemetry_logger.events[0].get("guild_id") == 202
-    assert telemetry_logger.events[0].get("outcome_id") == "playdate"
+    assert isinstance(telemetry_logger.events[0].get("outcome_id"), str)
+    assert telemetry_logger.events[0].get("outcome_id") not in {None, ""}
+    assert telemetry_logger.events[0].get("outcome_category") in {"funny", "cozy", "chaos-lite"}
 
 
 def test_socialize_horses_flow_rejects_self_target(tmp_path) -> None:

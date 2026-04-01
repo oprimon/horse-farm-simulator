@@ -20,6 +20,13 @@ from .lifecycle import (
 )
 from .moderation import BLOCKED_NAME_TERMS, contains_blocked_name_term, validate_horse_name
 from .progression import RideHorseResult, TrainHorseResult, ride_horse_flow, train_horse_flow
+from .playdate_story_engine import (
+	DEFAULT_PLAYDATE_STORIES,
+	PlaydateNarrative,
+	PlaydateStoryContext,
+	PlaydateStoryTemplate,
+	render_playdate_narrative,
+)
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
 from .stable import StableRosterResult, stable_roster_flow
 from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
@@ -42,6 +49,9 @@ __all__ = [
 	"RideHorseResult",
 	"StableRosterResult",
 	"StartOnboardingResult",
+	"PlaydateNarrative",
+	"PlaydateStoryContext",
+	"PlaydateStoryTemplate",
 	"TrainHorseResult",
 	"ViewCandidatesResult",
 	"admin_rename_horse_flow",
@@ -53,11 +63,13 @@ __all__ = [
 	"name_horse_flow",
 	"rest_horse_flow",
 	"ride_horse_flow",
+	"render_playdate_narrative",
 	"stable_roster_flow",
 	"socialize_horses_flow",
 	"start_onboarding_flow",
 	"train_horse_flow",
 	"view_candidates_flow",
+	"DEFAULT_PLAYDATE_STORIES",
 	"SocializeHorseResult",
 	"RideOutcomeEntry",
 	"RideOutcomeResult",

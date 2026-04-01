@@ -278,9 +278,15 @@ The service layer is intentionally split so each module owns one workflow surfac
 - src/pferdehof_bot/services/progression.py: Training and ride progression (`/train`, `/ride`)
 - src/pferdehof_bot/services/stable.py: Guild stable roster flow (`/stable`)
 - src/pferdehof_bot/services/social.py: Cooperative horse interaction flow (`/playdate`)
+- src/pferdehof_bot/services/playdate_story_engine.py: Expandable playdate narrative engine with stat-reactive flavor variants
 - src/pferdehof_bot/services/presentation_models.py: Shared response presentation dataclasses used by all workflow modules
 - src/pferdehof_bot/services/flow_utils.py: Shared helper utilities used across flow modules
 - src/pferdehof_bot/services/state_presentation.py: Horse state-to-text mapping helpers for profile and ride summaries
 - src/pferdehof_bot/services/telemetry.py: Telemetry payload assembly and logging adapters
 
 `src/pferdehof_bot/services/__init__.py` remains available as a convenience import surface, while internal modules and tests prefer direct imports from concrete service modules.
+
+### Playdate Story Contributions
+
+- Story schema and writing guide: `docs/playdate-story-schema.md`
+- Player suggestion template: `docs/playdate_story_suggestions_template.json`

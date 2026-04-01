@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import random
 from typing import Callable
 
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.repositories.player_repository import PlayerRecord
 
 from .flow_utils import clamp_stat, emit_telemetry, roll_d10, timestamp_now
+from .playdate_story_engine import PlaydateStoryContext, render_playdate_narrative
 from .presentation_models import PresentationField, ResponsePresentation
 from .telemetry import TelemetryLogger
 
@@ -62,6 +64,7 @@ def socialize_horses_flow(
     target_display_name: str,
     d10_roll: Callable[[], int] | None = None,
     now_provider: Callable[[], str] | None = None,
+    rng: random.Random | None = None,
     telemetry_logger: TelemetryLogger | None = None,
 ) -> SocializeHorseResult:
     """Run a cooperative horse interaction between two players in the same guild."""
@@ -192,6 +195,24 @@ def socialize_horses_flow(
     target_bond_gain = _roll_small_gain(d10_roll)
     target_confidence_gain = _roll_small_gain(d10_roll)
 
+    narrative = render_playdate_narrative(
+        PlaydateStoryContext(
+            initiator_horse_name=initiator_horse_name,
+            target_horse_name=target_horse_name,
+            initiator_player_name=display_name,
+            target_player_name=target_display_name,
+            initiator_energy=int(initiated_horse.get("energy") or 0),
+            target_energy=int(target_horse.get("energy") or 0),
+            initiator_confidence=int(initiated_horse.get("confidence") or 0),
+            target_confidence=int(target_horse.get("confidence") or 0),
+            initiator_bond=int(initiated_horse.get("bond") or 0),
+            target_bond=int(target_horse.get("bond") or 0),
+            initiator_health=int(initiated_horse.get("health") or 0),
+            target_health=int(target_horse.get("health") or 0),
+        ),
+        rng=rng,
+    )
+
     initiator_updates = {
         "bond": clamp_stat(int(initiated_horse.get("bond") or 0) + initiator_bond_gain),
         "confidence": clamp_stat(int(initiated_horse.get("confidence") or 0) + initiator_confidence_gain),
@@ -224,13 +245,12 @@ def socialize_horses_flow(
         user_id=user_id,
         guild_id=guild_id,
         horse_name=initiator_horse_name,
-        outcome_id="playdate",
-        outcome_category="cozy",
+        outcome_id=narrative.story_id,
+        outcome_category=narrative.tone,
     )
 
     message = (
-        f"{display_name} sets up a playdate: {initiator_horse_name} meets {target_horse_name} from {target_display_name}. "
-        f"Both horses leave brighter and more connected."
+        f"{display_name} sets up a playdate with {target_display_name}. {narrative.message}"
     )
     return SocializeHorseResult(
         initiator_player=updated_initiator,
@@ -245,7 +265,7 @@ def socialize_horses_flow(
         target_bond_gain=target_bond_gain,
         target_confidence_gain=target_confidence_gain,
         presentation=_build_presentation(
-            title="Stable Playdate",
+            title=f"Stable Playdate - {narrative.title}",
             description=message,
             accent="success",
             fields=(
