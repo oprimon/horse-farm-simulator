@@ -933,7 +933,6 @@ class CoreCog(commands.Cog):
             owner_user_ids=owner_user_ids,
             interaction_user_id=interaction.user.id,
             interaction_display_name=interaction_display_name,
-            allow_fetch=False,
         )
 
         normalized_current = str(current).strip().lower()

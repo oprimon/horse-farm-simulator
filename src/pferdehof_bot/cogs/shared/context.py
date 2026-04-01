@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import discord
 
 
@@ -19,8 +21,10 @@ async def build_owner_display_name_map(
     interaction_display_name: str,
     allow_fetch: bool = True,
 ) -> dict[int, str]:
-    """Resolve owner names with guild-display priority and API fallback."""
+    """Resolve owner names with guild-display priority and concurrent API fallback."""
     resolved_names: dict[int, str] = {}
+    ids_to_fetch: list[int] = []
+
     for owner_user_id in owner_user_ids:
         if owner_user_id == interaction_user_id:
             resolved_names[owner_user_id] = interaction_display_name
@@ -31,14 +35,17 @@ async def build_owner_display_name_map(
             resolved_names[owner_user_id] = getattr(member, "display_name", member.name)
             continue
 
-        if not allow_fetch:
-            continue
+        if allow_fetch:
+            ids_to_fetch.append(owner_user_id)
 
-        try:
-            fetched_member = await guild.fetch_member(owner_user_id)
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-            continue
-
-        resolved_names[owner_user_id] = getattr(fetched_member, "display_name", fetched_member.name)
+    if ids_to_fetch:
+        fetch_results = await asyncio.gather(
+            *(guild.fetch_member(uid) for uid in ids_to_fetch),
+            return_exceptions=True,
+        )
+        for uid, result in zip(ids_to_fetch, fetch_results):
+            if isinstance(result, BaseException):
+                continue
+            resolved_names[uid] = getattr(result, "display_name", result.name)
 
     return resolved_names

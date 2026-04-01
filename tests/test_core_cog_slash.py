@@ -167,7 +167,7 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
     )
 
     assert resolved == {}
-    assert guild.fetch_calls == [200, 201]
+    assert set(guild.fetch_calls) == {200, 201}
 
 
 def test_build_owner_display_name_map_can_skip_fetch_for_fast_paths(tmp_path) -> None:
@@ -796,7 +796,7 @@ def test_playdate_autocomplete_excludes_interacting_user(tmp_path) -> None:
     assert len(choices) == 2
 
 
-def test_playdate_autocomplete_uses_cache_only_owner_names(tmp_path) -> None:
+def test_playdate_autocomplete_resolves_uncached_owner_names_via_concurrent_fetch(tmp_path) -> None:
     bot = create_bot()
     repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
     core_cog = CoreCog(bot=bot, repository=repository)
@@ -806,7 +806,7 @@ def test_playdate_autocomplete_uses_cache_only_owner_names(tmp_path) -> None:
 
     interaction = _FakeInteraction()
     interaction.user = SimpleNamespace(id=101, name="Rider", display_name="Rider")
-    # Owner 102 is intentionally not cached; autocomplete should not fetch over API.
+    # Owner 102 is not in the member cache; autocomplete fetches concurrently and shows real name.
     interaction.guild = _FakeGuild(
         members={101: SimpleNamespace(name="rider", display_name="Rider")},
         fetch_results={102: SimpleNamespace(name="player2", display_name="Player2")},
@@ -818,7 +818,7 @@ def test_playdate_autocomplete_uses_cache_only_owner_names(tmp_path) -> None:
         core_cog.playdate_horse_id_autocomplete(interaction=interaction, current="")  # type: ignore[arg-type]
     )
 
-    assert interaction.guild.fetch_calls == []  # type: ignore[attr-defined]
+    assert interaction.guild.fetch_calls == [102]  # type: ignore[attr-defined]
     assert len(choices) == 1
-    assert "Rider 102" in choices[0].name
+    assert "Player2" in choices[0].name  # real name shown, not "Rider 102"
 
