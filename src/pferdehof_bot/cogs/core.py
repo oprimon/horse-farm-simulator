@@ -1,5 +1,6 @@
 """Core bot commands and baseline setup."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -22,7 +23,7 @@ from pferdehof_bot.services.lifecycle import (
 )
 from pferdehof_bot.services.presentation_models import ResponsePresentation
 from pferdehof_bot.services.progression import can_ride_player, can_train_player, ride_horse_flow, train_horse_flow
-from pferdehof_bot.services.social import socialize_horses_flow
+from pferdehof_bot.services.social import SOCIALIZE_COOLDOWN_SECONDS, SocializeHorseResult, socialize_horses_flow
 from pferdehof_bot.services.stable import stable_roster_flow
 from pferdehof_bot.services.telemetry import FileTelemetryLogger
 
@@ -90,6 +91,8 @@ class CoreCog(commands.Cog):
         result: _FlowResult,
         owner_user_id: int | None = None,
         view: discord.ui.View | None = None,
+        content_override: str | None = None,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         """Canonical response renderer for slash and button-triggered flows."""
         response_view = view
@@ -108,6 +111,8 @@ class CoreCog(commands.Cog):
             message=result.message,
             presentation=result.presentation,
             view=response_view,
+            content_override=content_override,
+            allowed_mentions=allowed_mentions,
         )
 
     async def _execute_owner_guarded_flow(
@@ -517,6 +522,8 @@ class CoreCog(commands.Cog):
         message: str,
         presentation: ResponsePresentation | None = None,
         view: discord.ui.View | None = None,
+        content_override: str | None = None,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         """Send a response based on command visibility metadata."""
         await send_response(
@@ -525,7 +532,80 @@ class CoreCog(commands.Cog):
             message=message,
             presentation=presentation,
             view=view,
+            content_override=content_override,
+            allowed_mentions=allowed_mentions,
         )
+
+    def _parse_stable_horse_id(self, raw_horse_id: str) -> int | None:
+        """Parse and validate a stable horse id input from slash command arguments."""
+        normalized = str(raw_horse_id).strip()
+        if not normalized:
+            return None
+
+        try:
+            parsed = int(normalized)
+        except ValueError:
+            return None
+
+        return parsed if parsed > 0 else None
+
+    def _build_playdate_target_mention(
+        self,
+        *,
+        result: SocializeHorseResult,
+        target_user_id: int,
+        now_timestamp: str | None = None,
+    ) -> tuple[str | None, discord.AllowedMentions | None]:
+        """Build smart mention payload for successful playdates without noisy ping spam."""
+        if not result.success:
+            return None, None
+
+        target_horse = (result.target_player or {}).get("horse") if result.target_player is not None else None
+        target_last_socialized_at = None
+        if isinstance(target_horse, dict):
+            target_last_socialized_at = target_horse.get("last_socialized_at")
+
+        if self._is_timestamp_within_window(
+            timestamp=target_last_socialized_at,
+            seconds=SOCIALIZE_COOLDOWN_SECONDS,
+            now_timestamp=now_timestamp,
+        ):
+            return None, None
+
+        mention = f"<@{target_user_id}> your horse just joined a playdate."
+        return mention, discord.AllowedMentions(users=True, roles=False, everyone=False, replied_user=False)
+
+    def _is_timestamp_within_window(
+        self,
+        *,
+        timestamp: object,
+        seconds: int,
+        now_timestamp: str | None = None,
+    ) -> bool:
+        """Return whether a timestamp falls within the trailing cooldown window from now."""
+        parsed_timestamp = self._parse_iso_timestamp(timestamp)
+        reference_timestamp = self._parse_iso_timestamp(now_timestamp) if now_timestamp is not None else datetime.now(UTC)
+        if parsed_timestamp is None or reference_timestamp is None:
+            return False
+        return (reference_timestamp - parsed_timestamp).total_seconds() < seconds
+
+    def _parse_iso_timestamp(self, raw_timestamp: object) -> datetime | None:
+        """Normalize optional text timestamps into UTC-aware datetime objects."""
+        if raw_timestamp is None:
+            return None
+
+        text = str(raw_timestamp).strip()
+        if not text:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     async def _build_owner_display_name_map(
         self,
@@ -778,9 +858,8 @@ class CoreCog(commands.Cog):
             )
             return
 
-        try:
-            horse_id = int(str(target_horse_id).strip())
-        except ValueError:
+        horse_id = self._parse_stable_horse_id(target_horse_id)
+        if horse_id is None:
             await self._send_response(
                 interaction=interaction,
                 command_id="playdate",
@@ -818,11 +897,17 @@ class CoreCog(commands.Cog):
             target_display_name=target_display_name,
             telemetry_logger=self._telemetry_logger,
         )
+        mention_content, allowed_mentions = self._build_playdate_target_mention(
+            result=result,
+            target_user_id=target_user_id,
+        )
         await self._respond_with_result(
             interaction=interaction,
             command_id="playdate",
             result=result,
             owner_user_id=interaction.user.id,
+            content_override=mention_content,
+            allowed_mentions=allowed_mentions,
         )
 
     @playdate.autocomplete("target_horse_id")

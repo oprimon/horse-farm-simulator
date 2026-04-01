@@ -93,6 +93,7 @@ class _FakeInteractionResponse:
         embed: discord.Embed | None = None,
         view: discord.ui.View | None = None,
         ephemeral: bool = False,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         self.calls.append(
             {
@@ -100,6 +101,7 @@ class _FakeInteractionResponse:
                 "embed": embed,
                 "view": view,
                 "ephemeral": ephemeral,
+                "allowed_mentions": allowed_mentions,
             }
         )
 
@@ -261,6 +263,66 @@ def test_send_response_without_presentation_sends_text_only(tmp_path) -> None:
     assert sent["embed"] is None
     assert sent["view"] is None
     assert sent["ephemeral"] is False
+
+
+def test_send_response_supports_content_override_with_embed(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    presentation = ResponsePresentation(
+        title="Stable Playdate",
+        description="Mia set up a playdate.",
+    )
+
+    asyncio.run(
+        core_cog._send_response(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="playdate",
+            message="fallback",
+            presentation=presentation,
+            content_override="<@102> your horse just joined a playdate.",
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False, replied_user=False),
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    assert sent["content"] == "<@102> your horse just joined a playdate."
+    assert isinstance(sent["embed"], discord.Embed)
+    assert sent["allowed_mentions"] is not None
+
+
+def test_build_playdate_target_mention_allows_ping_for_inactive_target(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        success=True,
+        target_player={"horse": {"last_socialized_at": None}},
+    )
+
+    mention, allowed_mentions = core_cog._build_playdate_target_mention(  # type: ignore[attr-defined]
+        result=result,  # type: ignore[arg-type]
+        target_user_id=222,
+        now_timestamp="2026-04-01T10:30:00+00:00",
+    )
+
+    assert mention == "<@222> your horse just joined a playdate."
+    assert allowed_mentions is not None
+
+
+def test_build_playdate_target_mention_suppresses_ping_for_recently_active_target(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        success=True,
+        target_player={"horse": {"last_socialized_at": "2026-04-01T10:00:00+00:00"}},
+    )
+
+    mention, allowed_mentions = core_cog._build_playdate_target_mention(  # type: ignore[attr-defined]
+        result=result,  # type: ignore[arg-type]
+        target_user_id=222,
+        now_timestamp="2026-04-01T10:10:00+00:00",
+    )
+
+    assert mention is None
+    assert allowed_mentions is None
 
 
 def test_build_profile_view_has_five_action_buttons(tmp_path) -> None:

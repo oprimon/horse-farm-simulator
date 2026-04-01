@@ -159,6 +159,7 @@ Rules:
 - autocomplete suggestions include horse id, horse name, and owner display name
 - you cannot target your own horse
 - playdate cooldown applies per initiating horse (60 minutes)
+- smart mention behavior: the target rider is pinged in channel unless they were recently active with playdate
 
 Example:
 

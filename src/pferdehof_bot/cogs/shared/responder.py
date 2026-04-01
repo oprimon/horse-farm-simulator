@@ -36,20 +36,55 @@ async def send_response(
     message: str,
     presentation: ResponsePresentation | None = None,
     view: discord.ui.View | None = None,
+    content_override: str | None = None,
+    allowed_mentions: discord.AllowedMentions | None = None,
 ) -> None:
     """Send a response based on command visibility metadata."""
     metadata = get_command_metadata(command_id)
     is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
     embed = build_embed(presentation) if presentation is not None else None
+    content = message if content_override is None else content_override
 
     # When an embed is present, suppress plain-text content to avoid duplicate output.
     if embed is not None and view is not None:
-        await interaction.response.send_message(None, embed=embed, view=view, ephemeral=is_ephemeral)
+        if allowed_mentions is not None:
+            await interaction.response.send_message(
+                content_override,
+                embed=embed,
+                view=view,
+                ephemeral=is_ephemeral,
+                allowed_mentions=allowed_mentions,
+            )
+        else:
+            await interaction.response.send_message(content_override, embed=embed, view=view, ephemeral=is_ephemeral)
         return
     if embed is not None:
-        await interaction.response.send_message(None, embed=embed, ephemeral=is_ephemeral)
+        if allowed_mentions is not None:
+            await interaction.response.send_message(
+                content_override,
+                embed=embed,
+                ephemeral=is_ephemeral,
+                allowed_mentions=allowed_mentions,
+            )
+        else:
+            await interaction.response.send_message(content_override, embed=embed, ephemeral=is_ephemeral)
         return
     if view is not None:
-        await interaction.response.send_message(message, view=view, ephemeral=is_ephemeral)
+        if allowed_mentions is not None:
+            await interaction.response.send_message(
+                content,
+                view=view,
+                ephemeral=is_ephemeral,
+                allowed_mentions=allowed_mentions,
+            )
+        else:
+            await interaction.response.send_message(content, view=view, ephemeral=is_ephemeral)
         return
-    await interaction.response.send_message(message, ephemeral=is_ephemeral)
+    if allowed_mentions is not None:
+        await interaction.response.send_message(
+            content,
+            ephemeral=is_ephemeral,
+            allowed_mentions=allowed_mentions,
+        )
+    else:
+        await interaction.response.send_message(content, ephemeral=is_ephemeral)
