@@ -150,6 +150,23 @@ Example:
 /greet
 ```
 
+### /playdate <target_horse_id>
+
+Starts a cooperative horse interaction with another horse in the same server stable.
+
+Rules:
+- target_horse_id must exist in `/stable`
+- autocomplete suggestions include horse id, horse name, and owner display name
+- you cannot target your own horse
+- playdate cooldown applies per initiating horse (60 minutes)
+- smart mention behavior: the target rider is pinged in channel unless they were recently active with playdate
+
+Example:
+
+```text
+/playdate 2
+```
+
 Migration mapping from prefix to slash:
 
 - `!start` -> `/start`
@@ -215,6 +232,7 @@ Supported event names:
 - rode_horse
 - ride_outcome
 - viewed_stable
+- social_interaction_completed
 
 Payload fields:
 
@@ -226,6 +244,7 @@ Payload fields:
 - horse_name (on care, training, and ride events)
 - outcome_id (on ride_outcome)
 - outcome_category (on ride_outcome)
+- outcome_id and outcome_category (on social_interaction_completed)
 
 Sample event payloads:
 
@@ -246,6 +265,28 @@ Analysis instructions:
 - pyproject.toml: Packaging and tooling config
 - src/pferdehof_bot/bot.py: Bot factory and extension loading
 - src/pferdehof_bot/cogs/core.py: Command handlers
-- src/pferdehof_bot/services/: Onboarding and interaction logic
+- src/pferdehof_bot/services/: Domain service layer split by workflow responsibility
 - src/pferdehof_bot/repositories/: Persistence layer
 - tests/: Unit and integration tests
+
+### Service Architecture
+
+The service layer is intentionally split so each module owns one workflow surface:
+
+- src/pferdehof_bot/services/lifecycle.py: Onboarding lifecycle and profile flows (`/start`, candidate selection, naming, greet, profile, admin rename)
+- src/pferdehof_bot/services/care.py: Care loops (`/feed`, `/groom`, `/rest`)
+- src/pferdehof_bot/services/progression.py: Training and ride progression (`/train`, `/ride`)
+- src/pferdehof_bot/services/stable.py: Guild stable roster flow (`/stable`)
+- src/pferdehof_bot/services/social.py: Cooperative horse interaction flow (`/playdate`)
+- src/pferdehof_bot/services/playdate_story_engine.py: Expandable playdate narrative engine with stat-reactive flavor variants
+- src/pferdehof_bot/services/presentation_models.py: Shared response presentation dataclasses used by all workflow modules
+- src/pferdehof_bot/services/flow_utils.py: Shared helper utilities used across flow modules
+- src/pferdehof_bot/services/state_presentation.py: Horse state-to-text mapping helpers for profile and ride summaries
+- src/pferdehof_bot/services/telemetry.py: Telemetry payload assembly and logging adapters
+
+`src/pferdehof_bot/services/__init__.py` remains available as a convenience import surface, while internal modules and tests prefer direct imports from concrete service modules.
+
+### Playdate Story Contributions
+
+- Story schema and writing guide: `docs/playdate-story-schema.md`
+- Player suggestion template: `docs/playdate_story_suggestions_template.json`

@@ -22,6 +22,7 @@ TelemetryEventName = Literal[
     "rode_horse",
     "ride_outcome",
     "viewed_stable",
+    "social_interaction_completed",
 ]
 
 

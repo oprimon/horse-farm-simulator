@@ -1,5 +1,6 @@
 """Core bot commands and baseline setup."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -7,25 +8,24 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from pferdehof_bot.command_registry import ResponseVisibility, get_command_metadata
+from pferdehof_bot.cogs.shared.context import build_owner_display_name_map, resolve_interaction_context
+from pferdehof_bot.cogs.shared.responder import build_embed, send_response
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services.onboarding import ResponsePresentation
-from pferdehof_bot.services import (
-    FileTelemetryLogger,
+from pferdehof_bot.services.care import feed_horse_flow, groom_horse_flow, rest_horse_flow
+from pferdehof_bot.services.lifecycle import (
     admin_rename_horse_flow,
     choose_candidate_flow,
-    feed_horse_flow,
     greet_horse_flow,
-    groom_horse_flow,
     horse_profile_flow,
     name_horse_flow,
-    rest_horse_flow,
-    ride_horse_flow,
-    stable_roster_flow,
     start_onboarding_flow,
-    train_horse_flow,
     view_candidates_flow,
 )
+from pferdehof_bot.services.presentation_models import ResponsePresentation
+from pferdehof_bot.services.progression import can_ride_player, can_train_player, ride_horse_flow, train_horse_flow
+from pferdehof_bot.services.social import SOCIALIZE_COOLDOWN_SECONDS, SocializeHorseResult, socialize_horses_flow
+from pferdehof_bot.services.stable import stable_roster_flow
+from pferdehof_bot.services.telemetry import FileTelemetryLogger
 
 
 DEFAULT_PLAYER_STORAGE_PATH = Path("data") / "players.json"
@@ -77,29 +77,11 @@ class CoreCog(commands.Cog):
 
     def _build_embed(self, presentation: ResponsePresentation) -> discord.Embed:
         """Build a Discord embed from a service presentation payload."""
-        accent = (presentation.accent or "").lower()
-        color_by_accent: dict[str, discord.Color] = {
-            "success": discord.Color.green(),
-            "warning": discord.Color.orange(),
-            "error": discord.Color.red(),
-            "info": discord.Color.blurple(),
-        }
-        embed = discord.Embed(
-            title=presentation.title,
-            description=presentation.description,
-            color=color_by_accent.get(accent, discord.Color.light_grey()),
-        )
-        for field in presentation.fields:
-            embed.add_field(name=field.name, value=field.value, inline=field.inline)
-        if presentation.footer is not None:
-            embed.set_footer(text=presentation.footer)
-        return embed
+        return build_embed(presentation)
 
     def _resolve_interaction_context(self, interaction: discord.Interaction) -> tuple[int | None, str]:
         """Return common per-interaction context used by service flows."""
-        guild_id = interaction.guild.id if interaction.guild is not None else None
-        display_name = getattr(interaction.user, "display_name", interaction.user.name)
-        return guild_id, display_name
+        return resolve_interaction_context(interaction)
 
     async def _respond_with_result(
         self,
@@ -109,6 +91,8 @@ class CoreCog(commands.Cog):
         result: _FlowResult,
         owner_user_id: int | None = None,
         view: discord.ui.View | None = None,
+        content_override: str | None = None,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         """Canonical response renderer for slash and button-triggered flows."""
         response_view = view
@@ -127,6 +111,8 @@ class CoreCog(commands.Cog):
             message=result.message,
             presentation=result.presentation,
             view=response_view,
+            content_override=content_override,
+            allowed_mentions=allowed_mentions,
         )
 
     async def _execute_owner_guarded_flow(
@@ -139,8 +125,11 @@ class CoreCog(commands.Cog):
         flow_runner: Callable[[int | None, str], _FlowResult],
     ) -> None:
         """Run a flow only for owner, then render through the canonical responder."""
-        if interaction.user.id != owner_user_id:
-            await interaction.response.send_message(wrong_user_message, ephemeral=True)
+        if not await self._guard_interaction_user(
+            interaction=interaction,
+            allowed_user_ids={owner_user_id},
+            wrong_user_message=wrong_user_message,
+        ):
             return
 
         guild_id, display_name = self._resolve_interaction_context(interaction)
@@ -151,6 +140,20 @@ class CoreCog(commands.Cog):
             result=result,
             owner_user_id=interaction.user.id,
         )
+
+    async def _guard_interaction_user(
+        self,
+        *,
+        interaction: discord.Interaction,
+        allowed_user_ids: set[int],
+        wrong_user_message: str,
+    ) -> bool:
+        """Return whether the interaction user is allowed for this action and emit guard message otherwise."""
+        if interaction.user.id in allowed_user_ids:
+            return True
+
+        await interaction.response.send_message(wrong_user_message, ephemeral=True)
+        return False
 
     def _build_candidate_view(
         self,
@@ -183,11 +186,11 @@ class CoreCog(commands.Cog):
                 self._disable_all()
 
             async def _handle_choice(self, interaction: discord.Interaction, candidate_id: str) -> None:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the player who opened these candidates can choose from this panel.",
-                        ephemeral=True,
-                    )
+                if not await cog._guard_interaction_user(
+                    interaction=interaction,
+                    allowed_user_ids={owner_user_id},
+                    wrong_user_message="Only the player who opened these candidates can choose from this panel.",
+                ):
                     return
 
                 guild_id = interaction.guild.id if interaction.guild is not None else None
@@ -397,11 +400,11 @@ class CoreCog(commands.Cog):
                 super().__init__(timeout=300)
 
             async def _run(self, interaction: discord.Interaction) -> None:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the horse's owner can use this action.",
-                        ephemeral=True,
-                    )
+                if not await cog._guard_interaction_user(
+                    interaction=interaction,
+                    allowed_user_ids={owner_user_id},
+                    wrong_user_message="Only the horse's owner can use this action.",
+                ):
                     return
 
                 await cog._respond_with_profile(interaction)
@@ -444,31 +447,11 @@ class CoreCog(commands.Cog):
 
     def _can_ride_from_player(self, player: dict[str, object] | None) -> bool:
         """Return whether a player's horse currently meets ride safety constraints."""
-        if player is None or not bool(player.get("adopted", False)):
-            return False
-        horse = player.get("horse")
-        if not isinstance(horse, dict):
-            return False
-        try:
-            energy = int(horse.get("energy") or 0)
-            health = int(horse.get("health") or 0)
-        except (TypeError, ValueError):
-            return False
-        return energy >= 30 and health >= 10
+        return can_ride_player(player)
 
     def _can_train_from_player(self, player: dict[str, object] | None) -> bool:
         """Return whether a player's horse currently meets training readiness constraints."""
-        if player is None or not bool(player.get("adopted", False)):
-            return False
-        horse = player.get("horse")
-        if not isinstance(horse, dict):
-            return False
-        try:
-            energy = int(horse.get("energy") or 0)
-            health = int(horse.get("health") or 0)
-        except (TypeError, ValueError):
-            return False
-        return energy >= 10 and health >= 10
+        return can_train_player(player)
 
     def _build_followup_view(
         self,
@@ -539,23 +522,90 @@ class CoreCog(commands.Cog):
         message: str,
         presentation: ResponsePresentation | None = None,
         view: discord.ui.View | None = None,
+        content_override: str | None = None,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         """Send a response based on command visibility metadata."""
-        metadata = get_command_metadata(command_id)
-        is_ephemeral = metadata.visibility == ResponseVisibility.EPHEMERAL
-        embed = self._build_embed(presentation) if presentation is not None else None
-        # When an embed is present, suppress the plain-text content so Discord
-        # does not render both the text and the card side-by-side.
-        if embed is not None and view is not None:
-            await interaction.response.send_message(None, embed=embed, view=view, ephemeral=is_ephemeral)
-            return
-        if embed is not None:
-            await interaction.response.send_message(None, embed=embed, ephemeral=is_ephemeral)
-            return
-        if view is not None:
-            await interaction.response.send_message(message, view=view, ephemeral=is_ephemeral)
-            return
-        await interaction.response.send_message(message, ephemeral=is_ephemeral)
+        await send_response(
+            interaction=interaction,
+            command_id=command_id,
+            message=message,
+            presentation=presentation,
+            view=view,
+            content_override=content_override,
+            allowed_mentions=allowed_mentions,
+        )
+
+    def _parse_stable_horse_id(self, raw_horse_id: str) -> int | None:
+        """Parse and validate a stable horse id input from slash command arguments."""
+        normalized = str(raw_horse_id).strip()
+        if not normalized:
+            return None
+
+        try:
+            parsed = int(normalized)
+        except ValueError:
+            return None
+
+        return parsed if parsed > 0 else None
+
+    def _build_playdate_target_mention(
+        self,
+        *,
+        result: SocializeHorseResult,
+        target_user_id: int,
+        now_timestamp: str | None = None,
+    ) -> tuple[str | None, discord.AllowedMentions | None]:
+        """Build smart mention payload for successful playdates without noisy ping spam."""
+        if not result.success:
+            return None, None
+
+        target_horse = (result.target_player or {}).get("horse") if result.target_player is not None else None
+        target_last_socialized_at = None
+        if isinstance(target_horse, dict):
+            target_last_socialized_at = target_horse.get("last_socialized_at")
+
+        if self._is_timestamp_within_window(
+            timestamp=target_last_socialized_at,
+            seconds=SOCIALIZE_COOLDOWN_SECONDS,
+            now_timestamp=now_timestamp,
+        ):
+            return None, None
+
+        mention = f"<@{target_user_id}> your horse just joined a playdate."
+        return mention, discord.AllowedMentions(users=True, roles=False, everyone=False, replied_user=False)
+
+    def _is_timestamp_within_window(
+        self,
+        *,
+        timestamp: object,
+        seconds: int,
+        now_timestamp: str | None = None,
+    ) -> bool:
+        """Return whether a timestamp falls within the trailing cooldown window from now."""
+        parsed_timestamp = self._parse_iso_timestamp(timestamp)
+        reference_timestamp = self._parse_iso_timestamp(now_timestamp) if now_timestamp is not None else datetime.now(UTC)
+        if parsed_timestamp is None or reference_timestamp is None:
+            return False
+        return (reference_timestamp - parsed_timestamp).total_seconds() < seconds
+
+    def _parse_iso_timestamp(self, raw_timestamp: object) -> datetime | None:
+        """Normalize optional text timestamps into UTC-aware datetime objects."""
+        if raw_timestamp is None:
+            return None
+
+        text = str(raw_timestamp).strip()
+        if not text:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     async def _build_owner_display_name_map(
         self,
@@ -565,25 +615,12 @@ class CoreCog(commands.Cog):
         interaction_display_name: str,
     ) -> dict[int, str]:
         """Resolve owner names with guild-display priority and API fallback."""
-        resolved_names: dict[int, str] = {}
-        for owner_user_id in owner_user_ids:
-            if owner_user_id == interaction_user_id:
-                resolved_names[owner_user_id] = interaction_display_name
-                continue
-
-            member = guild.get_member(owner_user_id)
-            if member is not None:
-                resolved_names[owner_user_id] = getattr(member, "display_name", member.name)
-                continue
-
-            try:
-                fetched_member = await guild.fetch_member(owner_user_id)
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                continue
-
-            resolved_names[owner_user_id] = getattr(fetched_member, "display_name", fetched_member.name)
-
-        return resolved_names
+        return await build_owner_display_name_map(
+            guild=guild,
+            owner_user_ids=owner_user_ids,
+            interaction_user_id=interaction_user_id,
+            interaction_display_name=interaction_display_name,
+        )
 
     @app_commands.command(name="start", description="Start or resume horse adoption onboarding")
     async def start(self, interaction: discord.Interaction) -> None:
@@ -797,6 +834,122 @@ class CoreCog(commands.Cog):
             result=result,
             owner_user_id=interaction.user.id,
         )
+
+    @app_commands.command(name="playdate", description="Let your horse socialize with another horse from the stable")
+    @app_commands.describe(target_horse_id="Horse id from /stable (for example: 2)")
+    async def playdate(self, interaction: discord.Interaction, target_horse_id: str) -> None:
+        """Run a cooperative horse playdate targeting a stable horse id."""
+        guild_id, display_name = self._resolve_interaction_context(interaction)
+        if guild_id is None:
+            result = socialize_horses_flow(
+                repository=self._repository,
+                user_id=interaction.user.id,
+                target_user_id=interaction.user.id,
+                guild_id=None,
+                display_name=display_name,
+                target_display_name=display_name,
+                telemetry_logger=self._telemetry_logger,
+            )
+            await self._respond_with_result(
+                interaction=interaction,
+                command_id="playdate",
+                result=result,
+                owner_user_id=interaction.user.id,
+            )
+            return
+
+        horse_id = self._parse_stable_horse_id(target_horse_id)
+        if horse_id is None:
+            await self._send_response(
+                interaction=interaction,
+                command_id="playdate",
+                message="Please provide a valid horse id from `/stable`, such as `1` or `2`.",
+            )
+            return
+
+        target_horse_row = self._repository.get_adopted_horse_by_id(guild_id=guild_id, horse_id=horse_id)
+        if target_horse_row is None:
+            await self._send_response(
+                interaction=interaction,
+                command_id="playdate",
+                message=f"No horse with id #{horse_id} was found in this server's stable. Use `/stable` to view valid ids.",
+            )
+            return
+
+        target_user_id = int(target_horse_row["owner_user_id"])
+        target_display_name = f"Rider {target_user_id}"
+        guild = interaction.guild
+        if guild is not None:
+            owner_display_names = await self._build_owner_display_name_map(
+                guild=guild,
+                owner_user_ids={target_user_id},
+                interaction_user_id=interaction.user.id,
+                interaction_display_name=display_name,
+            )
+            target_display_name = owner_display_names.get(target_user_id, target_display_name)
+
+        result = socialize_horses_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            target_user_id=target_user_id,
+            guild_id=guild_id,
+            display_name=display_name,
+            target_display_name=target_display_name,
+            telemetry_logger=self._telemetry_logger,
+        )
+        mention_content, allowed_mentions = self._build_playdate_target_mention(
+            result=result,
+            target_user_id=target_user_id,
+        )
+        await self._respond_with_result(
+            interaction=interaction,
+            command_id="playdate",
+            result=result,
+            owner_user_id=interaction.user.id,
+            content_override=mention_content,
+            allowed_mentions=allowed_mentions,
+        )
+
+    @playdate.autocomplete("target_horse_id")
+    async def playdate_horse_id_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest stable horse ids with horse and owner context for `/playdate`."""
+        guild = interaction.guild
+        if guild is None:
+            return []
+
+        guild_id = guild.id
+        raw_rows = self._repository.list_adopted_horses_by_guild(guild_id=guild_id)
+        owner_user_ids = {int(row["owner_user_id"]) for row in raw_rows}
+        interaction_display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        owner_display_names = await self._build_owner_display_name_map(
+            guild=guild,
+            owner_user_ids=owner_user_ids,
+            interaction_user_id=interaction.user.id,
+            interaction_display_name=interaction_display_name,
+        )
+
+        normalized_current = str(current).strip().lower()
+        choices: list[app_commands.Choice[str]] = []
+        for row in raw_rows:
+            horse_id = int(row["horse_id"])
+            owner_user_id = int(row["owner_user_id"])
+            if owner_user_id == interaction.user.id:
+                continue
+            horse_name = str(row["horse_name"])
+            owner_name = owner_display_names.get(owner_user_id, f"Rider {owner_user_id}")
+            label = f"#{horse_id} | {horse_name} | {owner_name}"
+            if normalized_current and normalized_current not in label.lower():
+                continue
+
+            choices.append(app_commands.Choice(name=label[:100], value=str(horse_id)))
+            if len(choices) >= 25:
+                break
+
+        return choices
 
     @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
     async def stable(self, interaction: discord.Interaction) -> None:

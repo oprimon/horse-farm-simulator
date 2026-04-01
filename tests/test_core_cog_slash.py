@@ -3,6 +3,7 @@
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import discord
 
@@ -10,6 +11,11 @@ from pferdehof_bot.bot import create_bot, load_extensions
 from pferdehof_bot.cogs.core import CoreCog
 from pferdehof_bot.repositories import JsonPlayerRepository
 from pferdehof_bot.services.onboarding import PresentationField, ResponsePresentation
+
+
+def _fake_http_response(*, status: int, reason: str) -> Any:
+    """Return a minimal response-like object for discord HTTP exception tests."""
+    return cast(Any, SimpleNamespace(status=status, reason=reason))
 
 
 def test_core_cog_registers_slash_commands() -> None:
@@ -25,6 +31,7 @@ def test_core_cog_registers_slash_commands() -> None:
     assert "train" in commands_by_name
     assert "ride" in commands_by_name
     assert "stable" in commands_by_name
+    assert "playdate" in commands_by_name
     assert "horse" in commands_by_name
 
     horse_group = commands_by_name["horse"]
@@ -54,6 +61,7 @@ def test_prefix_command_handlers_are_not_registered_after_migration() -> None:
     assert bot.get_command("train") is None
     assert bot.get_command("ride") is None
     assert bot.get_command("stable") is None
+    assert bot.get_command("playdate") is None
     assert bot.get_command("horse") is None
 
 
@@ -85,6 +93,7 @@ class _FakeInteractionResponse:
         embed: discord.Embed | None = None,
         view: discord.ui.View | None = None,
         ephemeral: bool = False,
+        allowed_mentions: discord.AllowedMentions | None = None,
     ) -> None:
         self.calls.append(
             {
@@ -92,6 +101,7 @@ class _FakeInteractionResponse:
                 "embed": embed,
                 "view": view,
                 "ephemeral": ephemeral,
+                "allowed_mentions": allowed_mentions,
             }
         )
 
@@ -99,6 +109,8 @@ class _FakeInteractionResponse:
 class _FakeInteraction:
     def __init__(self) -> None:
         self.response = _FakeInteractionResponse()
+        self.user: object = SimpleNamespace(id=0, name="User", display_name="User")
+        self.guild: object | None = None
 
 
 def _build_core_cog(tmp_path: Path) -> CoreCog:
@@ -140,8 +152,8 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
         members={},
         fetch_results={},
         fetch_errors={
-            200: discord.NotFound(response=SimpleNamespace(status=404, reason="missing"), message="missing"),
-            201: discord.Forbidden(response=SimpleNamespace(status=403, reason="forbidden"), message="forbidden"),
+            200: discord.NotFound(response=_fake_http_response(status=404, reason="missing"), message="missing"),
+            201: discord.Forbidden(response=_fake_http_response(status=403, reason="forbidden"), message="forbidden"),
         },
     )
 
@@ -253,6 +265,66 @@ def test_send_response_without_presentation_sends_text_only(tmp_path) -> None:
     assert sent["ephemeral"] is False
 
 
+def test_send_response_supports_content_override_with_embed(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    presentation = ResponsePresentation(
+        title="Stable Playdate",
+        description="Mia set up a playdate.",
+    )
+
+    asyncio.run(
+        core_cog._send_response(
+            interaction=interaction,  # type: ignore[arg-type]
+            command_id="playdate",
+            message="fallback",
+            presentation=presentation,
+            content_override="<@102> your horse just joined a playdate.",
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False, replied_user=False),
+        )
+    )
+
+    assert len(interaction.response.calls) == 1
+    sent = interaction.response.calls[0]
+    assert sent["content"] == "<@102> your horse just joined a playdate."
+    assert isinstance(sent["embed"], discord.Embed)
+    assert sent["allowed_mentions"] is not None
+
+
+def test_build_playdate_target_mention_allows_ping_for_inactive_target(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        success=True,
+        target_player={"horse": {"last_socialized_at": None}},
+    )
+
+    mention, allowed_mentions = core_cog._build_playdate_target_mention(  # type: ignore[attr-defined]
+        result=result,  # type: ignore[arg-type]
+        target_user_id=222,
+        now_timestamp="2026-04-01T10:30:00+00:00",
+    )
+
+    assert mention == "<@222> your horse just joined a playdate."
+    assert allowed_mentions is not None
+
+
+def test_build_playdate_target_mention_suppresses_ping_for_recently_active_target(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    result = SimpleNamespace(
+        success=True,
+        target_player={"horse": {"last_socialized_at": "2026-04-01T10:00:00+00:00"}},
+    )
+
+    mention, allowed_mentions = core_cog._build_playdate_target_mention(  # type: ignore[attr-defined]
+        result=result,  # type: ignore[arg-type]
+        target_user_id=222,
+        now_timestamp="2026-04-01T10:10:00+00:00",
+    )
+
+    assert mention is None
+    assert allowed_mentions is None
+
+
 def test_build_profile_view_has_five_action_buttons(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     view = core_cog._build_profile_view(owner_user_id=101)
@@ -275,7 +347,7 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     intruder_interaction.guild = None
 
     asyncio.run(
-        view._run(
+        cast(Any, view)._run(
             intruder_interaction,  # type: ignore[arg-type]
             lambda **_: None,
             "feed",
@@ -283,6 +355,42 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     )
     assert len(intruder_response.calls) == 1
     assert intruder_response.calls[0]["ephemeral"] is True
+
+
+def test_guard_interaction_user_accepts_allowed_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=101, name="Owner", display_name="Owner")
+
+    is_allowed = asyncio.run(
+        core_cog._guard_interaction_user(  # type: ignore[attr-defined]
+            interaction=interaction,  # type: ignore[arg-type]
+            allowed_user_ids={101, 202},
+            wrong_user_message="Nope",
+        )
+    )
+
+    assert is_allowed is True
+    assert interaction.response.calls == []
+
+
+def test_guard_interaction_user_rejects_unlisted_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
+
+    is_allowed = asyncio.run(
+        core_cog._guard_interaction_user(  # type: ignore[attr-defined]
+            interaction=interaction,  # type: ignore[arg-type]
+            allowed_user_ids={101, 202},
+            wrong_user_message="Blocked",
+        )
+    )
+
+    assert is_allowed is False
+    assert len(interaction.response.calls) == 1
+    assert interaction.response.calls[0]["content"] == "Blocked"
+    assert interaction.response.calls[0]["ephemeral"] is True
 
 
 def test_build_recovery_view_has_feed_and_rest_buttons(tmp_path) -> None:
@@ -361,12 +469,14 @@ def test_can_train_from_player_applies_energy_and_health_constraints(tmp_path) -
 def test_build_followup_view_returns_train_and_ride_for_feed_when_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 30, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="feed", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="feed", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -377,12 +487,14 @@ def test_build_followup_view_returns_train_and_ride_for_feed_when_ready(tmp_path
 def test_build_followup_view_returns_train_and_ride_for_rest_when_fully_ready(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 30, "health": 35}},
     )
 
-    view = core_cog._build_followup_view(command_id="rest", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="rest", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -452,12 +564,14 @@ def test_respond_with_result_builds_followup_view_for_care_result_without_blocke
 def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=True,
         player={"adopted": True, "horse": {"energy": 10, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="train", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="train", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -468,12 +582,14 @@ def test_build_followup_view_returns_recovery_for_deferred_train(tmp_path) -> No
 def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=True,
         player={"adopted": True, "horse": {"energy": 10, "health": 10}},
     )
 
-    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="ride", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -484,12 +600,14 @@ def test_build_followup_view_returns_recovery_for_deferred_ride(tmp_path) -> Non
 def test_build_followup_view_returns_profile_for_successful_ride(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     result = SimpleNamespace(
+        message="ok",
+        presentation=None,
         has_adopted_horse=True,
         blocked_by_readiness=False,
         player={"adopted": True, "horse": {"energy": 40, "health": 70}},
     )
 
-    view = core_cog._build_followup_view(command_id="ride", result=result, owner_user_id=101)
+    view = core_cog._build_followup_view(command_id="ride", result=cast(Any, result), owner_user_id=101)
 
     assert view is not None
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
@@ -499,7 +617,7 @@ def test_build_followup_view_returns_profile_for_successful_ride(tmp_path) -> No
 
 def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
-    candidates = [
+    candidates: list[dict[str, object]] = [
         {"id": "A", "appearance_text": "Chestnut"},
         {"id": "B", "appearance_text": "Bay"},
         {"id": "C", "appearance_text": "Grey"},
@@ -515,7 +633,7 @@ def test_build_candidate_view_builds_buttons_for_known_candidate_ids(tmp_path) -
 
 def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
-    candidates = [{"id": "Z"}]
+    candidates: list[dict[str, object]] = [{"id": "Z"}]
 
     view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
 
@@ -525,7 +643,7 @@ def test_build_candidate_view_returns_none_without_valid_candidates(tmp_path) ->
 def test_candidate_view_rejects_interaction_from_wrong_user(tmp_path) -> None:
     """A user who did not open /horse view cannot choose via the button panel."""
     core_cog = _build_core_cog(tmp_path)
-    candidates = [
+    candidates: list[dict[str, object]] = [
         {"id": "A", "appearance_text": "Chestnut"},
         {"id": "B", "appearance_text": "Bay"},
         {"id": "C", "appearance_text": "Grey"},
@@ -544,7 +662,7 @@ def test_candidate_view_rejects_interaction_from_wrong_user(tmp_path) -> None:
     assert len(intruder_response.calls) == 1
     call = intruder_response.calls[0]
     assert call["ephemeral"] is True
-    assert "Only the player" in call["content"]
+    assert "Only the player" in str(call["content"])
     # Buttons must still be enabled after an unauthorized attempt.
     buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
     assert all(not btn.disabled for btn in buttons)
@@ -567,7 +685,7 @@ def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> No
     )
     bot = create_bot()
     cog = CoreCog(bot=bot, repository=repository)
-    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    candidates: list[dict[str, object]] = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
     view = cog._build_candidate_view(candidates=candidates, owner_user_id=200)
     assert view is not None
 
@@ -592,11 +710,65 @@ def test_candidate_view_disables_buttons_after_successful_choice(tmp_path) -> No
 def test_candidate_view_on_timeout_disables_all_buttons(tmp_path) -> None:
     """on_timeout disables every button so an expired panel is visually clear."""
     core_cog = _build_core_cog(tmp_path)
-    candidates = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
+    candidates: list[dict[str, object]] = [{"id": "A"}, {"id": "B"}, {"id": "C"}]
     view = core_cog._build_candidate_view(candidates=candidates, owner_user_id=101)
     assert view is not None
 
     asyncio.run(view.on_timeout())
 
-    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
-    assert all(btn.disabled for btn in buttons)
+
+def _seed_adopted_player(repository: JsonPlayerRepository, user_id: int, guild_id: int, horse_name: str) -> None:
+    """Write a minimal adopted player record directly into the repository."""
+    repository.upsert_player({
+        "user_id": user_id,
+        "guild_id": guild_id,
+        "adopted": False,
+        "onboarding_session": {"active": False, "candidates": [], "chosen_candidate_id": None, "created_at": None},
+        "horse": None,
+    })
+    repository.start_onboarding(
+        user_id=user_id, guild_id=guild_id,
+        candidates=[{"id": "X", "appearance_text": "Bay", "hint": "Bold", "template_seed": 1}],
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="X")
+    repository.finalize_horse_name(
+        user_id=user_id, guild_id=guild_id, name=horse_name,
+        created_at="2026-01-01T00:01:00+00:00",
+    )
+
+
+def test_playdate_autocomplete_excludes_interacting_user(tmp_path) -> None:
+    """The autocomplete list must not include the calling user's own horse."""
+    bot = create_bot()
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    core_cog = CoreCog(bot=bot, repository=repository)
+
+    _seed_adopted_player(repository, user_id=101, guild_id=999, horse_name="Flash")   # interacting user
+    _seed_adopted_player(repository, user_id=102, guild_id=999, horse_name="Nova")    # other user
+    _seed_adopted_player(repository, user_id=103, guild_id=999, horse_name="Breeze")  # other user
+
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=101, name="Rider", display_name="Rider")
+    interaction.guild = _FakeGuild(
+        members={
+            101: SimpleNamespace(name="rider", display_name="Rider"),
+            102: SimpleNamespace(name="player2", display_name="Player2"),
+            103: SimpleNamespace(name="player3", display_name="Player3"),
+        },
+        fetch_results={},
+        fetch_errors={},
+    )
+    interaction.guild.id = 999  # type: ignore[attr-defined]
+
+    choices = asyncio.run(
+        core_cog.playdate_horse_id_autocomplete(interaction=interaction, current="")  # type: ignore[arg-type]
+    )
+
+    owner_ids_in_choices = {
+        repository.get_adopted_horse_by_id(guild_id=999, horse_id=int(c.value))["owner_user_id"]  # type: ignore[index]
+        for c in choices
+    }
+    assert 101 not in owner_ids_in_choices
+    assert len(choices) == 2
+

@@ -28,6 +28,7 @@ HORSE_TIMESTAMP_FIELDS: tuple[str, ...] = (
     "last_rested_at",
     "last_trained_at",
     "last_rode_at",
+    "last_socialized_at",
 )
 
 HORSE_STATE_UPDATE_FIELDS: frozenset[str] = frozenset(
@@ -238,9 +239,7 @@ class JsonPlayerRepository:
         updates: dict[str, Any],
     ) -> PlayerRecord:
         """Persist state changes for an adopted horse using a validated update payload."""
-        unknown_keys = sorted(set(updates) - HORSE_STATE_UPDATE_FIELDS)
-        if unknown_keys:
-            raise RepositoryError(f"Unsupported horse state fields: {', '.join(unknown_keys)}")
+        self._validate_supported_horse_update_fields(updates)
 
         data = self._load_data()
         key = self._player_key(user_id=user_id, guild_id=guild_id)
@@ -252,24 +251,55 @@ class JsonPlayerRepository:
         if horse is None or not bool(player.get("adopted", False)):
             raise RepositoryError("Player has no adopted horse to update.")
 
-        for field, value in updates.items():
-            if field in HORSE_STATE_DEFAULTS:
-                current_value = self._normalize_stat(horse.get(field), HORSE_STATE_DEFAULTS[field])
-                horse[field] = current_value if value is None else self._normalize_stat(value, current_value)
-                continue
-
-            if field in HORSE_TIMESTAMP_FIELDS:
-                horse[field] = self._normalize_optional_text(value)
-                continue
-
-            if field == "recent_activity":
-                horse[field] = self._normalize_optional_text(value)
+        self._apply_horse_updates(horse=horse, updates=updates)
 
         player["horse"] = horse
 
         data["players"][key] = self._normalize_player_record(player)
         self._save_data(data)
         return deepcopy(data["players"][key])
+
+    def update_two_horse_states(
+        self,
+        user_id: int,
+        target_user_id: int,
+        guild_id: int | None,
+        updates: dict[str, Any],
+        target_updates: dict[str, Any],
+    ) -> tuple[PlayerRecord, PlayerRecord]:
+        """Persist horse state changes for two adopted players within one save cycle."""
+        self._validate_supported_horse_update_fields(updates)
+        self._validate_supported_horse_update_fields(target_updates)
+
+        data = self._load_data()
+        key = self._player_key(user_id=user_id, guild_id=guild_id)
+        target_key = self._player_key(user_id=target_user_id, guild_id=guild_id)
+        if key == target_key:
+            raise RepositoryError("Dual horse update requires two different players.")
+
+        player = data["players"].get(key)
+        target_player = data["players"].get(target_key)
+        if player is None:
+            raise RepositoryError("No player record found for horse state update.")
+        if target_player is None:
+            raise RepositoryError("No target player record found for horse state update.")
+
+        horse = player.get("horse")
+        target_horse = target_player.get("horse")
+        if horse is None or not bool(player.get("adopted", False)):
+            raise RepositoryError("Player has no adopted horse to update.")
+        if target_horse is None or not bool(target_player.get("adopted", False)):
+            raise RepositoryError("Target player has no adopted horse to update.")
+
+        self._apply_horse_updates(horse=horse, updates=updates)
+        self._apply_horse_updates(horse=target_horse, updates=target_updates)
+
+        player["horse"] = horse
+        target_player["horse"] = target_horse
+        data["players"][key] = self._normalize_player_record(player)
+        data["players"][target_key] = self._normalize_player_record(target_player)
+        self._save_data(data)
+        return deepcopy(data["players"][key]), deepcopy(data["players"][target_key])
 
     def list_adopted_horses_by_guild(self, guild_id: int) -> list[dict[str, Any]]:
         """Return adopted horses in a guild with stable ordering and owner linkage."""
@@ -302,6 +332,18 @@ class JsonPlayerRepository:
 
         rows.sort(key=lambda row: (int(row["horse_id"]), int(row["owner_user_id"])))
         return rows
+
+    def get_adopted_horse_by_id(self, guild_id: int, horse_id: int) -> dict[str, Any] | None:
+        """Return one adopted horse row by stable horse id within a guild scope."""
+        stable_horse_id = self._coerce_positive_int(horse_id)
+        if stable_horse_id is None:
+            return None
+
+        for row in self.list_adopted_horses_by_guild(guild_id=guild_id):
+            if int(row["horse_id"]) == stable_horse_id:
+                return dict(row)
+
+        return None
 
     def _load_data(self) -> dict[str, Any]:
         if not self._storage_path.exists():
@@ -399,6 +441,7 @@ class JsonPlayerRepository:
             "last_rested_at": self._normalize_optional_text(horse.get("last_rested_at")),
             "last_trained_at": self._normalize_optional_text(horse.get("last_trained_at")),
             "last_rode_at": self._normalize_optional_text(horse.get("last_rode_at")),
+            "last_socialized_at": self._normalize_optional_text(horse.get("last_socialized_at")),
             "recent_activity": self._normalize_optional_text(horse.get("recent_activity")),
         }
 
@@ -455,8 +498,28 @@ class JsonPlayerRepository:
             "last_rested_at": None,
             "last_trained_at": None,
             "last_rode_at": None,
+            "last_socialized_at": None,
             "recent_activity": None,
         }
+
+    def _validate_supported_horse_update_fields(self, updates: dict[str, Any]) -> None:
+        unknown_keys = sorted(set(updates) - HORSE_STATE_UPDATE_FIELDS)
+        if unknown_keys:
+            raise RepositoryError(f"Unsupported horse state fields: {', '.join(unknown_keys)}")
+
+    def _apply_horse_updates(self, horse: dict[str, Any], updates: dict[str, Any]) -> None:
+        for field, value in updates.items():
+            if field in HORSE_STATE_DEFAULTS:
+                current_value = self._normalize_stat(horse.get(field), HORSE_STATE_DEFAULTS[field])
+                horse[field] = current_value if value is None else self._normalize_stat(value, current_value)
+                continue
+
+            if field in HORSE_TIMESTAMP_FIELDS:
+                horse[field] = self._normalize_optional_text(value)
+                continue
+
+            if field == "recent_activity":
+                horse[field] = self._normalize_optional_text(value)
 
     def _next_horse_id_for_guild(self, data: dict[str, Any], guild_id: int | None) -> int:
         used_ids: set[int] = set()

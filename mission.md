@@ -45,6 +45,7 @@ For Discord, this suggests a low-friction format:
 - Daily or cooldown-based progression.
 - Text-first storytelling.
 - Shared social spaces with optional cooperative play.
+- One direct horse-to-horse social action in early MVP to validate cooperative retention.
 
 ## Five Lean Startup Assumptions
 
@@ -158,6 +159,7 @@ Implication for MVP:
 Good early social ideas:
 
 - Help another player care for a tired horse.
+- Trigger a short horse playdate with another rider for small mutual bond/confidence gains.
 - Go on a group ride event.
 - Contribute to a shared stable milestone.
 - Send a small gift such as apples, brushes, or encouragement.
@@ -207,6 +209,7 @@ If we follow the assumptions above, the first MVP should likely include:
 - Progress action: train.
 - Fun action: ride with short interactive story outcomes.
 - Riding outcomes are mostly positive in early versions and focus on bond or skill growth.
+- One cooperative social action where two players' horses interact and both progress slightly.
 - A simple memory system so meaningful encounters can be revisited later.
 - Slow growth over time through repeated play.
 - One light social feature, preferably cooperative.

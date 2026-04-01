@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pferdehof_bot.services import build_horse_state_presentation
+from pferdehof_bot.services.state_presentation import build_horse_state_presentation
 
 
 def test_state_presentation_maps_low_bands_and_tired_readiness() -> None:

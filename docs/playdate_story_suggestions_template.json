@@ -1,0 +1,28 @@
+{
+  "stories": [
+    {
+      "story_id": "your_story_id_here",
+      "tone": "funny",
+      "title": "Your Story Title",
+      "weight": 7,
+      "opening_lines": [
+        "{initiator_horse} and {target_horse} discover something suspicious in the stable aisle."
+      ],
+      "event_lines": [
+        "They investigate with a level of seriousness that does not match the situation."
+      ],
+      "ending_lines": [
+        "By the end, both horses look proud of work nobody can fully explain."
+      ],
+      "cameo_none_lines": [
+        "No one interrupts, and the stable accepts the outcome."
+      ],
+      "cameo_one_lines": [
+        "{one_player} attempts to intervene and accidentally improves the chaos."
+      ],
+      "cameo_both_lines": [
+        "{initiator_player} and {target_player} decide this definitely counts as enrichment."
+      ]
+    }
+  ]
+}

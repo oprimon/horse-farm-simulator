@@ -5,17 +5,15 @@ from __future__ import annotations
 import random
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import (
+from pferdehof_bot.services.care import feed_horse_flow, groom_horse_flow
+from pferdehof_bot.services.lifecycle import (
     choose_candidate_flow,
-    feed_horse_flow,
-    groom_horse_flow,
     horse_profile_flow,
     name_horse_flow,
-    ride_horse_flow,
-    stable_roster_flow,
     start_onboarding_flow,
-    train_horse_flow,
 )
+from pferdehof_bot.services.progression import ride_horse_flow, train_horse_flow
+from pferdehof_bot.services.stable import stable_roster_flow
 
 
 def _fixed_candidates(_seed: int | str | None):

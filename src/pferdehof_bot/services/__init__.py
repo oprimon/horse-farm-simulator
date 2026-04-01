@@ -1,37 +1,37 @@
 """Application services for Pferdehof workflows."""
 
 from .candidate_generator import generate_candidate_horses
-from .moderation import BLOCKED_NAME_TERMS, contains_blocked_name_term, validate_horse_name
-from .onboarding import (
+from .care import FeedHorseResult, GroomHorseResult, RestHorseResult, feed_horse_flow, groom_horse_flow, rest_horse_flow
+from .lifecycle import (
 	AdminRenameHorseResult,
 	ChooseCandidateResult,
-	FeedHorseResult,
 	GreetHorseResult,
-	GroomHorseResult,
 	HorseProfileResult,
 	NameHorseResult,
-	RestHorseResult,
-	RideHorseResult,
-	StableRosterResult,
 	StartOnboardingResult,
-	TrainHorseResult,
 	ViewCandidatesResult,
 	admin_rename_horse_flow,
 	choose_candidate_flow,
-	feed_horse_flow,
 	greet_horse_flow,
-	groom_horse_flow,
 	horse_profile_flow,
 	name_horse_flow,
-	rest_horse_flow,
-	ride_horse_flow,
-	stable_roster_flow,
 	start_onboarding_flow,
-	train_horse_flow,
 	view_candidates_flow,
 )
+from .moderation import BLOCKED_NAME_TERMS, contains_blocked_name_term, validate_horse_name
+from .progression import RideHorseResult, TrainHorseResult, ride_horse_flow, train_horse_flow
+from .playdate_story_engine import (
+	DEFAULT_PLAYDATE_STORIES,
+	PlaydateNarrative,
+	PlaydateStoryContext,
+	PlaydateStoryTemplate,
+	load_story_packs_from_folder,
+	render_playdate_narrative,
+)
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
+from .stable import StableRosterResult, stable_roster_flow
 from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
+from .social import SocializeHorseResult, socialize_horses_flow
 from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
 
 __all__ = [
@@ -50,6 +50,9 @@ __all__ = [
 	"RideHorseResult",
 	"StableRosterResult",
 	"StartOnboardingResult",
+	"PlaydateNarrative",
+	"PlaydateStoryContext",
+	"PlaydateStoryTemplate",
 	"TrainHorseResult",
 	"ViewCandidatesResult",
 	"admin_rename_horse_flow",
@@ -61,10 +64,14 @@ __all__ = [
 	"name_horse_flow",
 	"rest_horse_flow",
 	"ride_horse_flow",
+	"render_playdate_narrative",
 	"stable_roster_flow",
+	"socialize_horses_flow",
 	"start_onboarding_flow",
 	"train_horse_flow",
 	"view_candidates_flow",
+	"DEFAULT_PLAYDATE_STORIES",
+	"SocializeHorseResult",
 	"RideOutcomeEntry",
 	"RideOutcomeResult",
 	"all_outcome_entries",

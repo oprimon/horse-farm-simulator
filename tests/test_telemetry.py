@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 from pferdehof_bot.repositories import JsonPlayerRepository
-from pferdehof_bot.services import (
+from pferdehof_bot.services.care import feed_horse_flow, groom_horse_flow, rest_horse_flow
+from pferdehof_bot.services.lifecycle import (
     choose_candidate_flow,
-    feed_horse_flow,
     greet_horse_flow,
-    groom_horse_flow,
     name_horse_flow,
-    rest_horse_flow,
-    ride_horse_flow,
-    stable_roster_flow,
     start_onboarding_flow,
-    train_horse_flow,
     view_candidates_flow,
-    build_telemetry_event,
 )
+from pferdehof_bot.services.progression import ride_horse_flow, train_horse_flow
+from pferdehof_bot.services.stable import stable_roster_flow
+from pferdehof_bot.services.telemetry import build_telemetry_event
 
 
 class InMemoryTelemetryLogger:
