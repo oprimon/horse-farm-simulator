@@ -6,11 +6,26 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import random
+import string
 
 
 _CAMEO_NONE = "none"
 _CAMEO_ONE = "one"
 _CAMEO_BOTH = "both"
+
+# Allowed placeholders per line field — violations are caught at load time.
+# opening/event/ending lines are formatted with horse names and player names but NOT {one_player}.
+# cameo lines are formatted with player names and {one_player} but NOT horse names.
+_STORY_LINE_ALLOWED = frozenset({"initiator_horse", "target_horse", "initiator_player", "target_player"})
+_CAMEO_LINE_ALLOWED = frozenset({"initiator_player", "target_player", "one_player"})
+_PLACEHOLDER_RULES: dict[str, frozenset[str]] = {
+    "opening_lines": _STORY_LINE_ALLOWED,
+    "event_lines": _STORY_LINE_ALLOWED,
+    "ending_lines": _STORY_LINE_ALLOWED,
+    "cameo_none_lines": _CAMEO_LINE_ALLOWED,
+    "cameo_one_lines": _CAMEO_LINE_ALLOWED,
+    "cameo_both_lines": _CAMEO_LINE_ALLOWED,
+}
 
 
 @dataclass(frozen=True)
@@ -243,7 +258,7 @@ def load_story_packs_from_folder(folder: Path) -> tuple[PlaydateStoryTemplate, .
 
 
 def _json_to_story_template(data: dict) -> PlaydateStoryTemplate:
-    return PlaydateStoryTemplate(
+    template = PlaydateStoryTemplate(
         story_id=str(data["story_id"]),
         tone=str(data["tone"]),
         title=str(data["title"]),
@@ -255,6 +270,20 @@ def _json_to_story_template(data: dict) -> PlaydateStoryTemplate:
         cameo_one_lines=tuple(str(line) for line in data.get("cameo_one_lines", [])),
         cameo_both_lines=tuple(str(line) for line in data.get("cameo_both_lines", [])),
     )
+    for field_name, allowed in _PLACEHOLDER_RULES.items():
+        _validate_line_placeholders(getattr(template, field_name), allowed, field_name)
+    return template
+
+
+def _validate_line_placeholders(lines: tuple[str, ...], allowed: frozenset[str], field: str) -> None:
+    """Raise ValueError if any line uses a placeholder not in allowed."""
+    for line in lines:
+        for _, field_key, _, _ in string.Formatter().parse(line):
+            if field_key is not None and field_key not in allowed:
+                raise ValueError(
+                    f"Illegal placeholder {{{field_key}}} in {field}. "
+                    f"Allowed: {sorted(allowed)}"
+                )
 
 
 def render_playdate_narrative(

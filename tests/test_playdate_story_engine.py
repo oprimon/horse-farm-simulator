@@ -155,3 +155,46 @@ def test_render_playdate_narrative_uses_folder_stories_when_provided(tmp_path: P
     assert narrative.story_id == "custom_story"
     assert narrative.tone == "cozy"
 
+
+def _bad_placeholder_entry(story_id: str, bad_field: str, bad_line: str) -> dict:
+    base = {
+        "story_id": story_id, "tone": "funny", "title": "T", "weight": 5,
+        "opening_lines": ["Opening."], "event_lines": ["Event."], "ending_lines": ["End."],
+        "cameo_none_lines": ["None."], "cameo_one_lines": ["{one_player} waves."],
+        "cameo_both_lines": ["{initiator_player} and {target_player} cheer."],
+    }
+    base[bad_field] = [bad_line]
+    return base
+
+
+def test_load_story_packs_skips_entry_with_one_player_in_opening_lines(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "bad.json").write_text(
+        json.dumps({"stories": [
+            _bad_placeholder_entry(
+                "bad_story", "opening_lines",
+                "{initiator_horse} and {one_player} open the show.",  # one_player illegal here
+            )
+        ]}),
+        encoding="utf-8",
+    )
+    stories = load_story_packs_from_folder(stories_dir)
+    assert stories == ()
+
+
+def test_load_story_packs_skips_entry_with_horse_name_in_cameo_lines(tmp_path: Path) -> None:
+    stories_dir = tmp_path / "stories"
+    stories_dir.mkdir()
+    (stories_dir / "bad.json").write_text(
+        json.dumps({"stories": [
+            _bad_placeholder_entry(
+                "bad_cameo", "cameo_none_lines",
+                "{initiator_horse} approves.",  # horse placeholder illegal in cameo field
+            )
+        ]}),
+        encoding="utf-8",
+    )
+    stories = load_story_packs_from_folder(stories_dir)
+    assert stories == ()
+

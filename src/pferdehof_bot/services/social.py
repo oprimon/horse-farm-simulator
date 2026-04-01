@@ -197,24 +197,25 @@ def socialize_horses_flow(
     target_bond_gain = _roll_small_gain(d10_roll)
     target_confidence_gain = _roll_small_gain(d10_roll)
 
-    narrative = render_playdate_narrative(
-        PlaydateStoryContext(
-            initiator_horse_name=initiator_horse_name,
-            target_horse_name=target_horse_name,
-            initiator_player_name=display_name,
-            target_player_name=target_display_name,
-            initiator_energy=int(initiated_horse.get("energy") or 0),
-            target_energy=int(target_horse.get("energy") or 0),
-            initiator_confidence=int(initiated_horse.get("confidence") or 0),
-            target_confidence=int(target_horse.get("confidence") or 0),
-            initiator_bond=int(initiated_horse.get("bond") or 0),
-            target_bond=int(target_horse.get("bond") or 0),
-            initiator_health=int(initiated_horse.get("health") or 0),
-            target_health=int(target_horse.get("health") or 0),
-        ),
-        rng=rng,
-        story_packs_dir=STORY_PACKS_DIR,
+    story_context = PlaydateStoryContext(
+        initiator_horse_name=initiator_horse_name,
+        target_horse_name=target_horse_name,
+        initiator_player_name=display_name,
+        target_player_name=target_display_name,
+        initiator_energy=int(initiated_horse.get("energy") or 0),
+        target_energy=int(target_horse.get("energy") or 0),
+        initiator_confidence=int(initiated_horse.get("confidence") or 0),
+        target_confidence=int(target_horse.get("confidence") or 0),
+        initiator_bond=int(initiated_horse.get("bond") or 0),
+        target_bond=int(target_horse.get("bond") or 0),
+        initiator_health=int(initiated_horse.get("health") or 0),
+        target_health=int(target_horse.get("health") or 0),
     )
+    try:
+        narrative = render_playdate_narrative(story_context, rng=rng, story_packs_dir=STORY_PACKS_DIR)
+    except Exception:
+        # Fallback: use built-in defaults if a community story pack causes a render error.
+        narrative = render_playdate_narrative(story_context, rng=rng, story_packs_dir=None)
 
     initiator_updates = {
         "bond": clamp_stat(int(initiated_horse.get("bond") or 0) + initiator_bond_gain),
