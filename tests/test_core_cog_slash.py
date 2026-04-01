@@ -170,6 +170,29 @@ def test_build_owner_display_name_map_skips_unresolvable_users(tmp_path) -> None
     assert guild.fetch_calls == [200, 201]
 
 
+def test_build_owner_display_name_map_can_skip_fetch_for_fast_paths(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    fetched_member = SimpleNamespace(name="FetchedName", display_name="Fetched Rider")
+    guild = _FakeGuild(
+        members={},
+        fetch_results={102: fetched_member},
+        fetch_errors={},
+    )
+
+    resolved = asyncio.run(
+        core_cog._build_owner_display_name_map(
+            guild=guild,  # type: ignore[arg-type]
+            owner_user_ids={102},
+            interaction_user_id=101,
+            interaction_display_name="Current Rider",
+            allow_fetch=False,
+        )
+    )
+
+    assert resolved == {}
+    assert guild.fetch_calls == []
+
+
 def test_resolve_interaction_context_uses_display_name_when_available(tmp_path) -> None:
     core_cog = _build_core_cog(tmp_path)
     interaction = _FakeInteraction()
@@ -771,4 +794,31 @@ def test_playdate_autocomplete_excludes_interacting_user(tmp_path) -> None:
     }
     assert 101 not in owner_ids_in_choices
     assert len(choices) == 2
+
+
+def test_playdate_autocomplete_uses_cache_only_owner_names(tmp_path) -> None:
+    bot = create_bot()
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    core_cog = CoreCog(bot=bot, repository=repository)
+
+    _seed_adopted_player(repository, user_id=101, guild_id=999, horse_name="Flash")
+    _seed_adopted_player(repository, user_id=102, guild_id=999, horse_name="Nova")
+
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=101, name="Rider", display_name="Rider")
+    # Owner 102 is intentionally not cached; autocomplete should not fetch over API.
+    interaction.guild = _FakeGuild(
+        members={101: SimpleNamespace(name="rider", display_name="Rider")},
+        fetch_results={102: SimpleNamespace(name="player2", display_name="Player2")},
+        fetch_errors={},
+    )
+    interaction.guild.id = 999  # type: ignore[attr-defined]
+
+    choices = asyncio.run(
+        core_cog.playdate_horse_id_autocomplete(interaction=interaction, current="")  # type: ignore[arg-type]
+    )
+
+    assert interaction.guild.fetch_calls == []  # type: ignore[attr-defined]
+    assert len(choices) == 1
+    assert "Rider 102" in choices[0].name
 

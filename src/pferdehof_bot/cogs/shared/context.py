@@ -17,6 +17,7 @@ async def build_owner_display_name_map(
     owner_user_ids: set[int],
     interaction_user_id: int,
     interaction_display_name: str,
+    allow_fetch: bool = True,
 ) -> dict[int, str]:
     """Resolve owner names with guild-display priority and API fallback."""
     resolved_names: dict[int, str] = {}
@@ -28,6 +29,9 @@ async def build_owner_display_name_map(
         member = guild.get_member(owner_user_id)
         if member is not None:
             resolved_names[owner_user_id] = getattr(member, "display_name", member.name)
+            continue
+
+        if not allow_fetch:
             continue
 
         try:
