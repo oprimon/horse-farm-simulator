@@ -204,7 +204,6 @@ def socialize_horses_flow(
     target_updates = {
         "bond": clamp_stat(int(target_horse.get("bond") or 0) + target_bond_gain),
         "confidence": clamp_stat(int(target_horse.get("confidence") or 0) + target_confidence_gain),
-        "last_socialized_at": now_timestamp,
         "recent_activity": (
             f"{target_horse_name} played with {initiator_horse_name} from {display_name}'s stable routine "
             f"(+{target_bond_gain} bond, +{target_confidence_gain} confidence)."

@@ -98,7 +98,7 @@ def test_socialize_horses_flow_updates_both_horses_and_emits_event(tmp_path) -> 
     assert initiator["horse"]["last_socialized_at"] == "2026-04-01T10:00:00+00:00"
     assert target["horse"]["bond"] == 28
     assert target["horse"]["confidence"] == 38
-    assert target["horse"]["last_socialized_at"] == "2026-04-01T10:00:00+00:00"
+    assert target["horse"]["last_socialized_at"] is None
 
     assert [event.get("event_name") for event in telemetry_logger.events] == ["social_interaction_completed"]
     assert telemetry_logger.events[0].get("user_id") == 101
@@ -173,3 +173,34 @@ def test_socialize_horses_flow_enforces_cooldown(tmp_path) -> None:
     assert second.success is False
     assert second.blocked_by_cooldown is True
     assert "Try again in about" in second.message
+
+
+def test_socialize_horses_flow_allows_reverse_direction_during_initiator_cooldown(tmp_path) -> None:
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    _adopt_horse(repository=repository, user_id=101, guild_id=202, horse_name="Nova")
+    _adopt_horse(repository=repository, user_id=102, guild_id=202, horse_name="Luna")
+
+    first = socialize_horses_flow(
+        repository=repository,
+        user_id=101,
+        target_user_id=102,
+        guild_id=202,
+        display_name="Mia",
+        target_display_name="Rowan",
+        now_provider=lambda: "2026-04-01T10:00:00+00:00",
+        d10_roll=lambda: 7,
+    )
+    reverse = socialize_horses_flow(
+        repository=repository,
+        user_id=102,
+        target_user_id=101,
+        guild_id=202,
+        display_name="Rowan",
+        target_display_name="Mia",
+        now_provider=lambda: "2026-04-01T10:10:00+00:00",
+        d10_roll=lambda: 8,
+    )
+
+    assert first.success is True
+    assert reverse.success is True
+    assert reverse.blocked_by_cooldown is False
