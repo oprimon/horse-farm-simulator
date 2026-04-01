@@ -288,7 +288,7 @@ def socialize_horses_flow(
                     inline=True,
                 ),
             ),
-            footer="Playdates are on cooldown for 60 minutes per initiating horse.",
+            footer="Playdates are on cooldown for you for 60 minutes.",
         ),
     )
 
