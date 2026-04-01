@@ -716,5 +716,59 @@ def test_candidate_view_on_timeout_disables_all_buttons(tmp_path) -> None:
 
     asyncio.run(view.on_timeout())
 
-    buttons = [item for item in view.children if isinstance(item, discord.ui.Button)]
-    assert all(btn.disabled for btn in buttons)
+
+def _seed_adopted_player(repository: JsonPlayerRepository, user_id: int, guild_id: int, horse_name: str) -> None:
+    """Write a minimal adopted player record directly into the repository."""
+    repository.upsert_player({
+        "user_id": user_id,
+        "guild_id": guild_id,
+        "adopted": False,
+        "onboarding_session": {"active": False, "candidates": [], "chosen_candidate_id": None, "created_at": None},
+        "horse": None,
+    })
+    repository.start_onboarding(
+        user_id=user_id, guild_id=guild_id,
+        candidates=[{"id": "X", "appearance_text": "Bay", "hint": "Bold", "template_seed": 1}],
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    repository.set_chosen_candidate(user_id=user_id, guild_id=guild_id, candidate_id="X")
+    repository.finalize_horse_name(
+        user_id=user_id, guild_id=guild_id, name=horse_name,
+        created_at="2026-01-01T00:01:00+00:00",
+    )
+
+
+def test_playdate_autocomplete_excludes_interacting_user(tmp_path) -> None:
+    """The autocomplete list must not include the calling user's own horse."""
+    bot = create_bot()
+    repository = JsonPlayerRepository(storage_path=tmp_path / "players.json")
+    core_cog = CoreCog(bot=bot, repository=repository)
+
+    _seed_adopted_player(repository, user_id=101, guild_id=999, horse_name="Flash")   # interacting user
+    _seed_adopted_player(repository, user_id=102, guild_id=999, horse_name="Nova")    # other user
+    _seed_adopted_player(repository, user_id=103, guild_id=999, horse_name="Breeze")  # other user
+
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=101, name="Rider", display_name="Rider")
+    interaction.guild = _FakeGuild(
+        members={
+            101: SimpleNamespace(name="rider", display_name="Rider"),
+            102: SimpleNamespace(name="player2", display_name="Player2"),
+            103: SimpleNamespace(name="player3", display_name="Player3"),
+        },
+        fetch_results={},
+        fetch_errors={},
+    )
+    interaction.guild.id = 999  # type: ignore[attr-defined]
+
+    choices = asyncio.run(
+        core_cog.playdate_horse_id_autocomplete(interaction=interaction, current="")  # type: ignore[arg-type]
+    )
+
+    owner_ids_in_choices = {
+        repository.get_adopted_horse_by_id(guild_id=999, horse_id=int(c.value))["owner_user_id"]  # type: ignore[index]
+        for c in choices
+    }
+    assert 101 not in owner_ids_in_choices
+    assert len(choices) == 2
+

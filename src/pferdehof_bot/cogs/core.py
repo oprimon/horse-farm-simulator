@@ -937,6 +937,8 @@ class CoreCog(commands.Cog):
         for row in raw_rows:
             horse_id = int(row["horse_id"])
             owner_user_id = int(row["owner_user_id"])
+            if owner_user_id == interaction.user.id:
+                continue
             horse_name = str(row["horse_name"])
             owner_name = owner_display_names.get(owner_user_id, f"Rider {owner_user_id}")
             label = f"#{horse_id} | {horse_name} | {owner_name}"
