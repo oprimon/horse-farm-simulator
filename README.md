@@ -150,19 +150,20 @@ Example:
 /greet
 ```
 
-### /playdate <target_player>
+### /playdate <target_horse_id>
 
-Starts a cooperative horse interaction with another rider in the same server.
+Starts a cooperative horse interaction with another horse in the same server stable.
 
 Rules:
-- target_player must be another member (you cannot target yourself)
-- both riders must already have an adopted horse
+- target_horse_id must exist in `/stable`
+- autocomplete suggestions include horse id, horse name, and owner display name
+- you cannot target your own horse
 - playdate cooldown applies per initiating horse (60 minutes)
 
 Example:
 
 ```text
-/playdate @Rowan
+/playdate 2
 ```
 
 Migration mapping from prefix to slash:

@@ -317,3 +317,59 @@ def test_update_two_horse_states_updates_both_players_in_one_save_cycle(tmp_path
     assert updated_b["horse"]["bond"] == 27
     assert updated_b["horse"]["confidence"] == 37
     assert updated_b["horse"]["last_socialized_at"] == "2026-04-01T10:00:00+00:00"
+
+
+def test_get_adopted_horse_by_id_resolves_owner_scoped_to_guild(tmp_path):
+    storage_path = tmp_path / "players.json"
+    with storage_path.open("w", encoding="utf-8") as storage_file:
+        json.dump(
+            {
+                "schema_version": 2,
+                "players": {
+                    "11:700": {
+                        "user_id": 11,
+                        "guild_id": 700,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": None,
+                        },
+                        "horse": {
+                            "horse_id": 1,
+                            "name": "Nova",
+                        },
+                    },
+                    "12:701": {
+                        "user_id": 12,
+                        "guild_id": 701,
+                        "adopted": True,
+                        "onboarding_session": {
+                            "active": False,
+                            "candidates": [],
+                            "chosen_candidate_id": None,
+                            "created_at": None,
+                        },
+                        "horse": {
+                            "horse_id": 1,
+                            "name": "Luna",
+                        },
+                    },
+                },
+            },
+            storage_file,
+            indent=2,
+        )
+
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    guild_row = repository.get_adopted_horse_by_id(guild_id=700, horse_id=1)
+    missing_row = repository.get_adopted_horse_by_id(guild_id=700, horse_id=99)
+
+    assert guild_row == {
+        "horse_id": 1,
+        "horse_name": "Nova",
+        "owner_user_id": 11,
+        "guild_id": 700,
+    }
+    assert missing_row is None

@@ -333,6 +333,18 @@ class JsonPlayerRepository:
         rows.sort(key=lambda row: (int(row["horse_id"]), int(row["owner_user_id"])))
         return rows
 
+    def get_adopted_horse_by_id(self, guild_id: int, horse_id: int) -> dict[str, Any] | None:
+        """Return one adopted horse row by stable horse id within a guild scope."""
+        stable_horse_id = self._coerce_positive_int(horse_id)
+        if stable_horse_id is None:
+            return None
+
+        for row in self.list_adopted_horses_by_guild(guild_id=guild_id):
+            if int(row["horse_id"]) == stable_horse_id:
+                return dict(row)
+
+        return None
+
     def _load_data(self) -> dict[str, Any]:
         if not self._storage_path.exists():
             return {"schema_version": SCHEMA_VERSION, "players": {}}

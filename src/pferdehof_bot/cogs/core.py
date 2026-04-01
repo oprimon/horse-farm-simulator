@@ -755,17 +755,64 @@ class CoreCog(commands.Cog):
             owner_user_id=interaction.user.id,
         )
 
-    @app_commands.command(name="playdate", description="Let your horse socialize with another player's horse")
-    @app_commands.describe(target_player="Pick another rider from this server")
-    async def playdate(self, interaction: discord.Interaction, target_player: discord.Member) -> None:
-        """Run a cooperative horse playdate between the caller and a target player's horse."""
+    @app_commands.command(name="playdate", description="Let your horse socialize with another horse from the stable")
+    @app_commands.describe(target_horse_id="Horse id from /stable (for example: 2)")
+    async def playdate(self, interaction: discord.Interaction, target_horse_id: str) -> None:
+        """Run a cooperative horse playdate targeting a stable horse id."""
         guild_id, display_name = self._resolve_interaction_context(interaction)
-        target_display_name = getattr(target_player, "display_name", target_player.name)
+        if guild_id is None:
+            result = socialize_horses_flow(
+                repository=self._repository,
+                user_id=interaction.user.id,
+                target_user_id=interaction.user.id,
+                guild_id=None,
+                display_name=display_name,
+                target_display_name=display_name,
+                telemetry_logger=self._telemetry_logger,
+            )
+            await self._respond_with_result(
+                interaction=interaction,
+                command_id="playdate",
+                result=result,
+                owner_user_id=interaction.user.id,
+            )
+            return
+
+        try:
+            horse_id = int(str(target_horse_id).strip())
+        except ValueError:
+            await self._send_response(
+                interaction=interaction,
+                command_id="playdate",
+                message="Please provide a valid horse id from `/stable`, such as `1` or `2`.",
+            )
+            return
+
+        target_horse_row = self._repository.get_adopted_horse_by_id(guild_id=guild_id, horse_id=horse_id)
+        if target_horse_row is None:
+            await self._send_response(
+                interaction=interaction,
+                command_id="playdate",
+                message=f"No horse with id #{horse_id} was found in this server's stable. Use `/stable` to view valid ids.",
+            )
+            return
+
+        target_user_id = int(target_horse_row["owner_user_id"])
+        target_display_name = f"Rider {target_user_id}"
+        guild = interaction.guild
+        if guild is not None:
+            owner_display_names = await self._build_owner_display_name_map(
+                guild=guild,
+                owner_user_ids={target_user_id},
+                interaction_user_id=interaction.user.id,
+                interaction_display_name=display_name,
+            )
+            target_display_name = owner_display_names.get(target_user_id, target_display_name)
 
         result = socialize_horses_flow(
             repository=self._repository,
             user_id=interaction.user.id,
-            target_user_id=target_player.id,
+            target_user_id=target_user_id,
             guild_id=guild_id,
             display_name=display_name,
             target_display_name=target_display_name,
@@ -777,6 +824,45 @@ class CoreCog(commands.Cog):
             result=result,
             owner_user_id=interaction.user.id,
         )
+
+    @playdate.autocomplete("target_horse_id")
+    async def playdate_horse_id_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest stable horse ids with horse and owner context for `/playdate`."""
+        guild = interaction.guild
+        if guild is None:
+            return []
+
+        guild_id = guild.id
+        raw_rows = self._repository.list_adopted_horses_by_guild(guild_id=guild_id)
+        owner_user_ids = {int(row["owner_user_id"]) for row in raw_rows}
+        interaction_display_name = getattr(interaction.user, "display_name", interaction.user.name)
+        owner_display_names = await self._build_owner_display_name_map(
+            guild=guild,
+            owner_user_ids=owner_user_ids,
+            interaction_user_id=interaction.user.id,
+            interaction_display_name=interaction_display_name,
+        )
+
+        normalized_current = str(current).strip().lower()
+        choices: list[app_commands.Choice[str]] = []
+        for row in raw_rows:
+            horse_id = int(row["horse_id"])
+            owner_user_id = int(row["owner_user_id"])
+            horse_name = str(row["horse_name"])
+            owner_name = owner_display_names.get(owner_user_id, f"Rider {owner_user_id}")
+            label = f"#{horse_id} | {horse_name} | {owner_name}"
+            if normalized_current and normalized_current not in label.lower():
+                continue
+
+            choices.append(app_commands.Choice(name=label[:100], value=str(horse_id)))
+            if len(choices) >= 25:
+                break
+
+        return choices
 
     @app_commands.command(name="stable", description="Show the adopted horses in this server's stable")
     async def stable(self, interaction: discord.Interaction) -> None:
