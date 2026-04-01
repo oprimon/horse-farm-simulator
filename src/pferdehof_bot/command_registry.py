@@ -104,6 +104,12 @@ COMMAND_REGISTRY: dict[str, CommandMetadata] = {
         subcommand_name=None,
         visibility=ResponseVisibility.CHANNEL,
     ),
+    "playdate": CommandMetadata(
+        identifier="playdate",
+        command_name="playdate",
+        subcommand_name=None,
+        visibility=ResponseVisibility.CHANNEL,
+    ),
 }
 
 

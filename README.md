@@ -150,6 +150,21 @@ Example:
 /greet
 ```
 
+### /playdate <target_player>
+
+Starts a cooperative horse interaction with another rider in the same server.
+
+Rules:
+- target_player must be another member (you cannot target yourself)
+- both riders must already have an adopted horse
+- playdate cooldown applies per initiating horse (60 minutes)
+
+Example:
+
+```text
+/playdate @Rowan
+```
+
 Migration mapping from prefix to slash:
 
 - `!start` -> `/start`
@@ -215,6 +230,7 @@ Supported event names:
 - rode_horse
 - ride_outcome
 - viewed_stable
+- social_interaction_completed
 
 Payload fields:
 
@@ -226,6 +242,7 @@ Payload fields:
 - horse_name (on care, training, and ride events)
 - outcome_id (on ride_outcome)
 - outcome_category (on ride_outcome)
+- outcome_id and outcome_category (on social_interaction_completed)
 
 Sample event payloads:
 
@@ -258,6 +275,7 @@ The service layer is intentionally split so each module owns one workflow surfac
 - src/pferdehof_bot/services/care.py: Care loops (`/feed`, `/groom`, `/rest`)
 - src/pferdehof_bot/services/progression.py: Training and ride progression (`/train`, `/ride`)
 - src/pferdehof_bot/services/stable.py: Guild stable roster flow (`/stable`)
+- src/pferdehof_bot/services/social.py: Cooperative horse interaction flow (`/playdate`)
 - src/pferdehof_bot/services/presentation_models.py: Shared response presentation dataclasses used by all workflow modules
 - src/pferdehof_bot/services/flow_utils.py: Shared helper utilities used across flow modules
 - src/pferdehof_bot/services/state_presentation.py: Horse state-to-text mapping helpers for profile and ride summaries

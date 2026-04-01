@@ -23,6 +23,7 @@ from .progression import RideHorseResult, TrainHorseResult, ride_horse_flow, tra
 from .ride_outcomes import RideOutcomeEntry, RideOutcomeResult, all_outcome_entries, compute_readiness_score, select_ride_outcome
 from .stable import StableRosterResult, stable_roster_flow
 from .state_presentation import HorseStatePresentation, StateEmbedField, build_horse_state_presentation
+from .social import SocializeHorseResult, socialize_horses_flow
 from .telemetry import FileTelemetryLogger, TelemetryEvent, TelemetryLogger, build_telemetry_event
 
 __all__ = [
@@ -53,9 +54,11 @@ __all__ = [
 	"rest_horse_flow",
 	"ride_horse_flow",
 	"stable_roster_flow",
+	"socialize_horses_flow",
 	"start_onboarding_flow",
 	"train_horse_flow",
 	"view_candidates_flow",
+	"SocializeHorseResult",
 	"RideOutcomeEntry",
 	"RideOutcomeResult",
 	"all_outcome_entries",

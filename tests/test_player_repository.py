@@ -180,6 +180,7 @@ def test_repository_migrates_mvp001_adopted_record_to_schema_v2(tmp_path):
     assert horse["last_rested_at"] is None
     assert horse["last_trained_at"] is None
     assert horse["last_rode_at"] is None
+    assert horse["last_socialized_at"] is None
     assert horse["recent_activity"] is None
 
     repository.update_horse_state(
@@ -274,3 +275,45 @@ def test_list_adopted_horses_by_guild_returns_sorted_scoped_rows(tmp_path):
     assert other_guild_rows == [
         {"horse_id": 1, "horse_name": "Nova", "owner_user_id": 503, "guild_id": 701},
     ]
+
+
+def test_update_two_horse_states_updates_both_players_in_one_save_cycle(tmp_path):
+    storage_path = tmp_path / "players.json"
+    repository = JsonPlayerRepository(storage_path=storage_path)
+    candidates = [
+        {"id": "A", "appearance_text": "Palomino", "hint": "Gentle", "template_seed": 99},
+        {"id": "B", "appearance_text": "Dun", "hint": "Steady", "template_seed": 98},
+        {"id": "C", "appearance_text": "Black", "hint": "Bold", "template_seed": 97},
+    ]
+
+    repository.start_onboarding(user_id=1, guild_id=700, candidates=candidates)
+    repository.set_chosen_candidate(user_id=1, guild_id=700, candidate_id="A")
+    repository.finalize_horse_name(user_id=1, guild_id=700, name="Nova")
+    repository.start_onboarding(user_id=2, guild_id=700, candidates=candidates)
+    repository.set_chosen_candidate(user_id=2, guild_id=700, candidate_id="B")
+    repository.finalize_horse_name(user_id=2, guild_id=700, name="Luna")
+
+    updated_a, updated_b = repository.update_two_horse_states(
+        user_id=1,
+        target_user_id=2,
+        guild_id=700,
+        updates={
+            "bond": 28,
+            "confidence": 36,
+            "last_socialized_at": "2026-04-01T10:00:00+00:00",
+            "recent_activity": "Nova had a playdate with Luna.",
+        },
+        target_updates={
+            "bond": 27,
+            "confidence": 37,
+            "last_socialized_at": "2026-04-01T10:00:00+00:00",
+            "recent_activity": "Luna had a playdate with Nova.",
+        },
+    )
+
+    assert updated_a["horse"]["bond"] == 28
+    assert updated_a["horse"]["confidence"] == 36
+    assert updated_a["horse"]["last_socialized_at"] == "2026-04-01T10:00:00+00:00"
+    assert updated_b["horse"]["bond"] == 27
+    assert updated_b["horse"]["confidence"] == 37
+    assert updated_b["horse"]["last_socialized_at"] == "2026-04-01T10:00:00+00:00"

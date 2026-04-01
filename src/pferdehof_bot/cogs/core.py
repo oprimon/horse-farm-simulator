@@ -22,6 +22,7 @@ from pferdehof_bot.services.lifecycle import (
 )
 from pferdehof_bot.services.presentation_models import ResponsePresentation
 from pferdehof_bot.services.progression import can_ride_player, can_train_player, ride_horse_flow, train_horse_flow
+from pferdehof_bot.services.social import socialize_horses_flow
 from pferdehof_bot.services.stable import stable_roster_flow
 from pferdehof_bot.services.telemetry import FileTelemetryLogger
 
@@ -119,8 +120,11 @@ class CoreCog(commands.Cog):
         flow_runner: Callable[[int | None, str], _FlowResult],
     ) -> None:
         """Run a flow only for owner, then render through the canonical responder."""
-        if interaction.user.id != owner_user_id:
-            await interaction.response.send_message(wrong_user_message, ephemeral=True)
+        if not await self._guard_interaction_user(
+            interaction=interaction,
+            allowed_user_ids={owner_user_id},
+            wrong_user_message=wrong_user_message,
+        ):
             return
 
         guild_id, display_name = self._resolve_interaction_context(interaction)
@@ -131,6 +135,20 @@ class CoreCog(commands.Cog):
             result=result,
             owner_user_id=interaction.user.id,
         )
+
+    async def _guard_interaction_user(
+        self,
+        *,
+        interaction: discord.Interaction,
+        allowed_user_ids: set[int],
+        wrong_user_message: str,
+    ) -> bool:
+        """Return whether the interaction user is allowed for this action and emit guard message otherwise."""
+        if interaction.user.id in allowed_user_ids:
+            return True
+
+        await interaction.response.send_message(wrong_user_message, ephemeral=True)
+        return False
 
     def _build_candidate_view(
         self,
@@ -163,11 +181,11 @@ class CoreCog(commands.Cog):
                 self._disable_all()
 
             async def _handle_choice(self, interaction: discord.Interaction, candidate_id: str) -> None:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the player who opened these candidates can choose from this panel.",
-                        ephemeral=True,
-                    )
+                if not await cog._guard_interaction_user(
+                    interaction=interaction,
+                    allowed_user_ids={owner_user_id},
+                    wrong_user_message="Only the player who opened these candidates can choose from this panel.",
+                ):
                     return
 
                 guild_id = interaction.guild.id if interaction.guild is not None else None
@@ -377,11 +395,11 @@ class CoreCog(commands.Cog):
                 super().__init__(timeout=300)
 
             async def _run(self, interaction: discord.Interaction) -> None:
-                if interaction.user.id != owner_user_id:
-                    await interaction.response.send_message(
-                        "Only the horse's owner can use this action.",
-                        ephemeral=True,
-                    )
+                if not await cog._guard_interaction_user(
+                    interaction=interaction,
+                    allowed_user_ids={owner_user_id},
+                    wrong_user_message="Only the horse's owner can use this action.",
+                ):
                     return
 
                 await cog._respond_with_profile(interaction)
@@ -733,6 +751,29 @@ class CoreCog(commands.Cog):
         await self._respond_with_result(
             interaction=interaction,
             command_id="ride",
+            result=result,
+            owner_user_id=interaction.user.id,
+        )
+
+    @app_commands.command(name="playdate", description="Let your horse socialize with another player's horse")
+    @app_commands.describe(target_player="Pick another rider from this server")
+    async def playdate(self, interaction: discord.Interaction, target_player: discord.Member) -> None:
+        """Run a cooperative horse playdate between the caller and a target player's horse."""
+        guild_id, display_name = self._resolve_interaction_context(interaction)
+        target_display_name = getattr(target_player, "display_name", target_player.name)
+
+        result = socialize_horses_flow(
+            repository=self._repository,
+            user_id=interaction.user.id,
+            target_user_id=target_player.id,
+            guild_id=guild_id,
+            display_name=display_name,
+            target_display_name=target_display_name,
+            telemetry_logger=self._telemetry_logger,
+        )
+        await self._respond_with_result(
+            interaction=interaction,
+            command_id="playdate",
             result=result,
             owner_user_id=interaction.user.id,
         )

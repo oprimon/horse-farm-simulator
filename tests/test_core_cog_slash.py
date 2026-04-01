@@ -31,6 +31,7 @@ def test_core_cog_registers_slash_commands() -> None:
     assert "train" in commands_by_name
     assert "ride" in commands_by_name
     assert "stable" in commands_by_name
+    assert "playdate" in commands_by_name
     assert "horse" in commands_by_name
 
     horse_group = commands_by_name["horse"]
@@ -60,6 +61,7 @@ def test_prefix_command_handlers_are_not_registered_after_migration() -> None:
     assert bot.get_command("train") is None
     assert bot.get_command("ride") is None
     assert bot.get_command("stable") is None
+    assert bot.get_command("playdate") is None
     assert bot.get_command("horse") is None
 
 
@@ -291,6 +293,42 @@ def test_build_profile_view_rejects_wrong_user(tmp_path) -> None:
     )
     assert len(intruder_response.calls) == 1
     assert intruder_response.calls[0]["ephemeral"] is True
+
+
+def test_guard_interaction_user_accepts_allowed_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=101, name="Owner", display_name="Owner")
+
+    is_allowed = asyncio.run(
+        core_cog._guard_interaction_user(  # type: ignore[attr-defined]
+            interaction=interaction,  # type: ignore[arg-type]
+            allowed_user_ids={101, 202},
+            wrong_user_message="Nope",
+        )
+    )
+
+    assert is_allowed is True
+    assert interaction.response.calls == []
+
+
+def test_guard_interaction_user_rejects_unlisted_user(tmp_path) -> None:
+    core_cog = _build_core_cog(tmp_path)
+    interaction = _FakeInteraction()
+    interaction.user = SimpleNamespace(id=999, name="Intruder", display_name="Intruder")
+
+    is_allowed = asyncio.run(
+        core_cog._guard_interaction_user(  # type: ignore[attr-defined]
+            interaction=interaction,  # type: ignore[arg-type]
+            allowed_user_ids={101, 202},
+            wrong_user_message="Blocked",
+        )
+    )
+
+    assert is_allowed is False
+    assert len(interaction.response.calls) == 1
+    assert interaction.response.calls[0]["content"] == "Blocked"
+    assert interaction.response.calls[0]["ephemeral"] is True
 
 
 def test_build_recovery_view_has_feed_and_rest_buttons(tmp_path) -> None:
